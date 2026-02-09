@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>People Systems Diagnostic</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Newsreader:opsz,wght@6..72,500;6..72,700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="ambient ambient-a"></div>
+    <div class="ambient ambient-b"></div>
+
+    <main class="shell">
+      <header class="hero card">
+        <p class="kicker">HR REPORTER STUDIO</p>
+        <h1>People Systems Diagnostic</h1>
+        <p class="subtitle">
+          One workflow for local and AWS deployment. Submit text, files, and URLs together,
+          then receive a structured client-ready report.
+        </p>
+        <div id="config-badges" class="badges"></div>
+      </header>
+
+      <section class="layout">
+        <section class="card composer">
+          <h2>Input</h2>
+          <form id="analysis-form">
+            <label class="field">
+              <span>Paste Company Notes</span>
+              <textarea id="text" name="text" rows="8" placeholder="Paste discovery notes, interviews, policy snippets, hiring plans, manager pain points, etc."></textarea>
+            </label>
+
+            <label class="field">
+              <span>URL Sources</span>
+              <textarea id="urls" name="urls" rows="3" placeholder="Paste URL(s), one per line or comma-separated"></textarea>
+            </label>
+
+            <div id="url-drop" class="dropzone drop-url">
+              <p>Drop URL text here</p>
+              <small>Links are auto-detected from dropped text.</small>
+            </div>
+
+            <div id="file-drop" class="dropzone drop-file">
+              <input id="files" type="file" name="files" multiple hidden />
+              <p>Drag and drop files</p>
+              <small>TXT, MD, PDF, DOCX. Click to browse or paste files from clipboard.</small>
+              <button id="browse-btn" type="button" class="btn secondary">Choose Files</button>
+            </div>
+
+            <div id="file-list" class="file-list"></div>
+
+            <div class="actions">
+              <button id="submit-btn" type="submit" class="btn primary">Run Assessment</button>
+              <button id="clear-btn" type="button" class="btn secondary">Clear</button>
+              <span id="status" class="status"></span>
+            </div>
+          </form>
+        </section>
+
+        <section class="card output" id="output-panel" hidden>
+          <div class="output-head">
+            <h2>Report</h2>
+            <div class="output-actions">
+              <button id="copy-md" type="button" class="btn secondary">Copy Markdown</button>
+              <button id="download-json" type="button" class="btn secondary">Download JSON</button>
+            </div>
+          </div>
+          <p id="meta" class="meta"></p>
+          <pre id="report-preview" class="report-preview"></pre>
+        </section>
+      </section>
+    </main>
+
+    <script src="/app.js" defer></script>
+  </body>
+</html>

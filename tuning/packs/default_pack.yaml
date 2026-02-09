@@ -1,0 +1,438 @@
+version: "1.0"
+name: "Default HR Growth Pack"
+disclaimer: "This is not legal advice; consider reviewing with counsel."
+
+stages:
+  - id: "0-10"
+    label: "0-10 employees"
+    min_headcount: 0
+    max_headcount: 10
+    description: "Founder-led operations with limited formal HR structure."
+  - id: "11-40"
+    label: "11-40 employees"
+    min_headcount: 11
+    max_headcount: 40
+    description: "Emerging people operations; ad-hoc policies become risky."
+  - id: "41-100"
+    label: "41-100 employees"
+    min_headcount: 41
+    max_headcount: 100
+    description: "Manager layer appears; consistency and compliance controls matter."
+  - id: "101-250"
+    label: "101-250 employees"
+    min_headcount: 101
+    max_headcount: 250
+    description: "Multi-team scaling; requires stronger systems and governance."
+  - id: "251-500"
+    label: "251-500 employees"
+    min_headcount: 251
+    max_headcount: 500
+    description: "Operational complexity increases; data rigor and ER discipline needed."
+  - id: "500+"
+    label: "500+ employees"
+    min_headcount: 501
+    max_headcount:
+    description: "Enterprise-like execution expected across HR lifecycle."
+
+weights:
+  area_weights:
+    compliance_policies: 1.8
+    hiring: 1.1
+    onboarding: 1.0
+    manager_enablement: 1.1
+    performance: 1.0
+    comp_leveling: 1.2
+    hris_data: 1.2
+    er_retention: 1.5
+    benefits: 0.9
+  severity_weights:
+    low: 1.0
+    medium: 2.0
+    high: 3.0
+    critical: 4.0
+  compliance_multiplier: 1.3
+  unknown_penalty: 0.2
+
+templates:
+  markdown_template: "app/report/templates/report.md.j2"
+  section_titles:
+    growth_areas: "Prioritized Growth Areas"
+    risks: "Risk Register"
+    plan: "30/60/90-Day Action Plan"
+
+prompt_overrides:
+  snapshot_guidance: "Prefer conservative extraction; unknown unless explicitly stated."
+  plan_style: "Direct, consultant-ready, with clear owners and sequence."
+
+checks:
+  - id: "cp_employee_handbook"
+    area: "compliance_policies"
+    title: "Current Employee Handbook"
+    description: "Handbook appears missing or outdated, increasing policy inconsistency risk."
+    severity: "high"
+    required_fields: ["policies.employee_handbook"]
+    actions:
+      - "Draft or refresh handbook with state-specific addenda where needed."
+      - "Define annual legal/policy review cadence with owners."
+    metrics: ["policies.employee_handbook"]
+    question_if_unknown: "Do you have a current employee handbook and last review date?"
+    compliance: true
+
+  - id: "cp_anti_harassment_training"
+    area: "compliance_policies"
+    title: "Anti-Harassment Policy and Training Tracking"
+    description: "Missing policy or training records can create avoidable compliance and ER exposure."
+    severity: "critical"
+    required_fields: ["policies.anti_harassment_policy", "hris_data.mandatory_training_tracking"]
+    actions:
+      - "Publish anti-harassment policy with complaint channels."
+      - "Track completion for required harassment training by jurisdiction."
+    metrics: ["hris_data.mandatory_training_tracking"]
+    question_if_unknown: "Is harassment training completion tracked by employee and location?"
+    compliance: true
+    question_group: "harassment_tracking"
+    retrieval_queries:
+      - "anti-harassment policy complaint channel retaliation"
+      - "harassment training completion tracking LMS HRIS"
+    evidence_requirements:
+      policy_patterns: ["anti-harassment", "harassment policy", "complaint channel"]
+      tracking_patterns: ["training completion", "completion tracked", "LMS", "HRIS"]
+    evidence_scoring:
+      explicit: ["we have an anti-harassment policy", "training completion is tracked"]
+      ambiguous: ["harassment", "training"]
+    coverage_expectations:
+      url_patterns: ["people-policies", "people-group", "legal", "compliance"]
+
+  - id: "cp_leave_overtime"
+    area: "compliance_policies"
+    title: "Leave and Overtime Policy Coverage"
+    description: "Leave/overtime ambiguity drives wage-hour and leave administration risk."
+    severity: "critical"
+    required_fields: ["policies.leave_policy", "policies.overtime_policy"]
+    actions:
+      - "Publish leave policy matrix by state and worker type."
+      - "Clarify overtime eligibility and approval controls."
+    metrics: ["policies.leave_policy", "policies.overtime_policy"]
+    question_if_unknown: "Are leave and overtime policies documented and communicated?"
+    compliance: true
+    question_group: "leave_overtime"
+    retrieval_queries:
+      - "leave policy sick time PTO time off eligibility"
+      - "overtime policy exempt non-exempt overtime approval"
+    evidence_requirements:
+      leave_patterns: ["leave policy", "time off policy", "sick time"]
+      overtime_patterns: ["overtime", "exempt", "non-exempt"]
+    evidence_scoring:
+      explicit: ["leave policy states", "overtime policy applies"]
+      ambiguous: ["time off", "leave"]
+    coverage_expectations:
+      url_patterns: ["time-off", "leave", "policies"]
+
+  - id: "hiring_structured_process"
+    area: "hiring"
+    title: "Structured Hiring Process"
+    description: "Unstructured hiring can reduce quality and increase bias risk as volume grows."
+    severity: "high"
+    required_fields: ["hiring.structured_interviews", "hiring.offer_approval"]
+    actions:
+      - "Implement calibrated interview scorecards."
+      - "Add standardized offer approval checkpoints."
+    metrics: ["hiring.structured_interviews"]
+    question_if_unknown: "Are interview rubrics and approvals consistently used?"
+
+  - id: "hiring_job_architecture"
+    area: "hiring"
+    title: "Job Architecture Clarity"
+    description: "Role ambiguity creates leveling and compensation inconsistency."
+    severity: "medium"
+    required_fields: ["hiring.job_architecture"]
+    actions:
+      - "Define role families, levels, and core competencies."
+      - "Align job descriptions to level expectations."
+    metrics: ["hiring.job_architecture"]
+    question_if_unknown: "Do you maintain a formal job architecture by level?"
+
+  - id: "onboarding_program"
+    area: "onboarding"
+    title: "Standardized Onboarding Program"
+    description: "Inconsistent onboarding slows productivity and increases early attrition risk."
+    severity: "high"
+    required_fields: ["onboarding.onboarding_program"]
+    actions:
+      - "Define baseline onboarding checklist for all functions."
+      - "Track first-30-day completion milestones."
+    metrics: ["onboarding.onboarding_program"]
+    question_if_unknown: "Is onboarding standardized across teams?"
+
+  - id: "onboarding_role_plan"
+    area: "onboarding"
+    title: "Role-Level 30/60/90 Plans"
+    description: "Missing role plans weaken manager alignment and time-to-productivity."
+    severity: "medium"
+    required_fields: ["onboarding.role_plan_30_60_90"]
+    actions:
+      - "Create role-specific 30/60/90 expectations for critical roles."
+      - "Review plans during manager check-ins."
+    metrics: ["onboarding.role_plan_30_60_90"]
+    question_if_unknown: "Do new hires receive role-specific 30/60/90 expectations?"
+
+  - id: "mgr_training"
+    area: "manager_enablement"
+    title: "Manager Basics Training"
+    description: "Untrained managers increase performance, ER, and retention volatility."
+    severity: "high"
+    required_fields: ["manager_enablement.manager_training"]
+    actions:
+      - "Launch manager essentials training (feedback, documentation, ER escalation)."
+      - "Require completion before managing larger teams."
+    metrics: ["manager_enablement.manager_training"]
+    question_if_unknown: "Is manager training mandatory and completion-tracked?"
+
+  - id: "mgr_1on1"
+    area: "manager_enablement"
+    title: "One-on-One Cadence"
+    description: "Irregular manager check-ins reduce coaching quality and issue detection."
+    severity: "medium"
+    required_fields: ["manager_enablement.one_on_one_cadence"]
+    actions:
+      - "Set minimum 1:1 cadence expectations by team."
+      - "Monitor adherence through manager dashboards."
+    metrics: ["manager_enablement.one_on_one_cadence"]
+    question_if_unknown: "What is your expected 1:1 cadence for people managers?"
+
+  - id: "perf_review_cycle"
+    area: "performance"
+    title: "Performance Review Cycle"
+    description: "No review cadence weakens accountability and development planning."
+    severity: "high"
+    required_fields: ["performance.review_cycle"]
+    actions:
+      - "Set company-wide review cadence and timeline."
+      - "Introduce calibration for manager consistency."
+    metrics: ["performance.review_cycle"]
+    question_if_unknown: "Is there a documented performance review cycle?"
+    question_group: "performance_system"
+    retrieval_queries:
+      - "performance review cycle bi-annual annual calibration"
+      - "review timeline performance process"
+
+  - id: "perf_goals"
+    area: "performance"
+    title: "Goal Framework"
+    description: "Without explicit goals, performance conversations and prioritization drift."
+    severity: "medium"
+    required_fields: ["performance.goal_framework"]
+    actions:
+      - "Adopt a lightweight goal framework (OKR or equivalent)."
+      - "Train managers on quarterly goal-setting quality."
+    metrics: ["performance.goal_framework"]
+    question_if_unknown: "Do teams use a consistent goal framework?"
+    question_group: "performance_system"
+    retrieval_queries:
+      - "goal framework OKR goals performance objectives"
+      - "goal-setting cadence"
+
+  - id: "comp_bands_levels"
+    area: "comp_leveling"
+    title: "Pay Bands and Leveling Framework"
+    description: "Missing pay/level structure increases equity and retention risk."
+    severity: "high"
+    required_fields: ["comp_leveling.pay_bands", "comp_leveling.leveling_framework"]
+    actions:
+      - "Define pay bands by level and location."
+      - "Create compensation decision guidelines and approval thresholds."
+    metrics: ["comp_leveling.pay_bands", "comp_leveling.leveling_framework"]
+    question_if_unknown: "Are pay bands and level definitions documented?"
+    retrieval_queries:
+      - "pay bands compensation bands leveling framework"
+      - "job levels compensation philosophy"
+    evidence_requirements:
+      pay_band_patterns: ["pay band", "salary band", "compensation band"]
+      leveling_patterns: ["leveling framework", "job level", "career ladder"]
+    evidence_scoring:
+      explicit: ["pay bands are documented", "leveling framework defines"]
+      implicit: ["compensation philosophy", "career levels"]
+
+  - id: "hris_source_of_truth"
+    area: "hris_data"
+    title: "HRIS Source of Truth and Data Audits"
+    description: "Fragmented HR data reduces reporting accuracy and compliance readiness."
+    severity: "high"
+    required_fields: ["hris_data.hris_system", "hris_data.data_audit_cadence"]
+    actions:
+      - "Designate HRIS system of record for core employee data."
+      - "Run monthly HR data quality audits with issue log."
+    metrics: ["hris_data.hris_system", "hris_data.data_audit_cadence"]
+    question_if_unknown: "What HRIS is system-of-record and how often is data audited?"
+    retrieval_queries:
+      - "HRIS system of record Workday BambooHR Rippling"
+      - "data audit cadence monthly quarterly"
+    evidence_requirements:
+      hris_vendors: ["Workday", "BambooHR", "Rippling", "ADP", "UKG", "SuccessFactors", "Gusto"]
+      audit_patterns: ["data audit", "audit cadence", "data quality review"]
+    evidence_scoring:
+      explicit: ["we use Workday", "system of record is", "monthly data audit"]
+      implicit: ["HRIS", "people data"]
+    coverage_expectations:
+      url_patterns: ["hris", "systems", "people-ops", "operations"]
+
+  - id: "er_case_process"
+    area: "er_retention"
+    title: "Employee Relations Case Process"
+    description: "Lack of ER intake/escalation process increases legal and culture risk."
+    severity: "critical"
+    required_fields: ["er_retention.er_case_process"]
+    actions:
+      - "Define ER case intake, triage, and documentation workflow."
+      - "Train managers on escalation triggers and response SLAs."
+    metrics: ["er_retention.er_case_process"]
+    question_if_unknown: "Is there a formal ER case process and documentation standard?"
+    compliance: true
+
+  - id: "retention_signals"
+    area: "er_retention"
+    title: "Retention and Engagement Signals"
+    description: "No attrition/engagement signals limits proactive retention planning."
+    severity: "medium"
+    required_fields: ["er_retention.attrition_rate", "er_retention.engagement_survey"]
+    actions:
+      - "Establish monthly voluntary attrition reporting by team."
+      - "Run recurring pulse surveys and close feedback loops."
+    metrics: ["er_retention.attrition_rate", "er_retention.engagement_survey"]
+    question_if_unknown: "Do you track voluntary attrition and engagement trends?"
+    question_group: "retention_signals"
+    retrieval_queries:
+      - "voluntary attrition turnover rate retention"
+      - "engagement survey pulse survey eNPS"
+    evidence_requirements:
+      attrition_patterns: ["voluntary attrition", "turnover rate", "retention rate"]
+      survey_patterns: ["engagement survey", "pulse survey", "eNPS"]
+    evidence_scoring:
+      explicit: ["we track voluntary attrition", "engagement survey is run"]
+      ambiguous: ["retention", "engagement"]
+    coverage_expectations:
+      url_patterns: ["retention", "engagement", "people-analytics"]
+
+  - id: "benefits_foundation"
+    area: "benefits"
+    title: "Benefits Eligibility and Vendor Governance"
+    description: "Undefined benefits rules create employee confusion and administration risk."
+    severity: "medium"
+    required_fields: ["benefits.benefits_eligibility_policy", "benefits.benefits_broker"]
+    actions:
+      - "Document benefits eligibility by worker class and location."
+      - "Define broker/vendor performance review cadence."
+    metrics: ["benefits.benefits_eligibility_policy", "benefits.benefits_broker"]
+    question_if_unknown: "Are benefits eligibility rules and vendor ownership documented?"
+    retrieval_queries:
+      - "benefits eligibility policy employee classes locations"
+      - "benefits broker vendor governance"
+    coverage_expectations:
+      url_patterns: ["benefits", "total-rewards"]
+
+question_groups:
+  performance_system:
+    fields: ["performance.review_cycle", "performance.goal_framework"]
+    prompt: "How is performance managed end-to-end (review cycle + goal framework)?"
+  retention_signals:
+    fields: ["er_retention.attrition_rate", "er_retention.engagement_survey"]
+    prompt: "How do you monitor retention and engagement signals?"
+  leave_overtime:
+    fields: ["policies.leave_policy", "policies.overtime_policy"]
+    prompt: "Are leave and overtime policies documented and current by jurisdiction?"
+  harassment_tracking:
+    fields: ["policies.anti_harassment_policy", "hris_data.mandatory_training_tracking"]
+    prompt: "Do you have anti-harassment policy coverage and completion tracking?"
+
+field_query_hints:
+  headcount:
+    followup_questions:
+      - "What is current employee headcount?"
+    retrieval_queries:
+      - "headcount employee count total employees"
+    evidence_requirements:
+      regex: ["\\bheadcount\\b", "\\b\\d{1,5}\\s+(employees|people|FTE)\\b"]
+    evidence_scoring:
+      explicit: ["headcount is", "employee count is"]
+      implicit: ["team of"]
+    coverage_expectations:
+      url_patterns: ["about", "company", "careers"]
+  headcount_range:
+    followup_questions:
+      - "Can you confirm the current headcount range?"
+    retrieval_queries:
+      - "headcount range 11-40 41-100 101-250 500+"
+    evidence_requirements:
+      regex: ["\\b\\d{1,5}\\s*-\\s*\\d{1,5}\\b", "\\b\\d{1,5}\\+\\b"]
+    evidence_scoring:
+      explicit: ["employees", "headcount"]
+  hris_data.hris_system:
+    followup_questions:
+      - "Which HRIS is system-of-record?"
+    retrieval_queries:
+      - "HRIS system Workday BambooHR Rippling ADP UKG SuccessFactors"
+      - "time away in Workday"
+    evidence_requirements:
+      vendors: ["Workday", "BambooHR", "Rippling", "ADP", "UKG", "SuccessFactors", "Gusto"]
+    evidence_scoring:
+      explicit: ["we use Workday", "system of record is"]
+      implicit: ["HRIS", "people system"]
+    coverage_expectations:
+      url_patterns: ["hris", "operations", "people-ops", "systems"]
+  hris_data.mandatory_training_tracking:
+    followup_questions:
+      - "How do you track mandatory training completion?"
+    retrieval_queries:
+      - "mandatory training completion tracking LMS"
+      - "harassment training completion by employee"
+    evidence_requirements:
+      regex: ["training completion", "completion tracked", "LMS"]
+    evidence_scoring:
+      explicit: ["completion is tracked", "training records are maintained"]
+      ambiguous: ["training"]
+    coverage_expectations:
+      url_patterns: ["training", "compliance", "people-policies"]
+  policies.overtime_policy:
+    followup_questions:
+      - "Is overtime eligibility and approval policy documented?"
+    retrieval_queries:
+      - "overtime policy exempt non-exempt eligibility"
+    evidence_requirements:
+      regex: ["overtime", "exempt", "non-exempt"]
+    evidence_scoring:
+      explicit: ["overtime policy", "non-exempt employees"]
+      ambiguous: ["overtime"]
+    coverage_expectations:
+      url_patterns: ["policies", "time-off", "leave"]
+  er_retention.engagement_survey:
+    followup_questions:
+      - "Do you run recurring engagement or pulse surveys?"
+    retrieval_queries:
+      - "engagement survey pulse survey eNPS"
+    evidence_requirements:
+      regex: ["engagement survey", "pulse survey", "eNPS"]
+    evidence_scoring:
+      explicit: ["we run engagement surveys", "quarterly pulse survey"]
+      ambiguous: ["engagement"]
+    coverage_expectations:
+      url_patterns: ["engagement", "retention", "people-analytics"]
+  comp_leveling.pay_bands:
+    followup_questions:
+      - "Are pay bands documented by level/location?"
+    retrieval_queries:
+      - "pay bands compensation bands salary bands"
+    evidence_requirements:
+      regex: ["pay bands?", "salary bands?"]
+    evidence_scoring:
+      explicit: ["pay bands are documented"]
+      ambiguous: ["compensation structure"]
+  comp_leveling.leveling_framework:
+    followup_questions:
+      - "Is there a formal leveling framework?"
+    retrieval_queries:
+      - "leveling framework career levels job architecture"
+    evidence_requirements:
+      regex: ["leveling framework", "career ladder", "job levels?"]
+    evidence_scoring:
+      explicit: ["leveling framework defines"]
+      ambiguous: ["levels"]

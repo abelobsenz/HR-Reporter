@@ -1,0 +1,554 @@
+{
+  "$defs": {
+    "Citation": {
+      "additionalProperties": false,
+      "properties": {
+        "chunk_id": {
+          "title": "Chunk Id",
+          "type": "string"
+        },
+        "snippet": {
+          "title": "Snippet",
+          "type": "string"
+        },
+        "source_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Id"
+        },
+        "doc_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Doc Id"
+        },
+        "start_char": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Start Char"
+        },
+        "end_char": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "End Char"
+        },
+        "evidence_recovered_by": {
+          "anyOf": [
+            {
+              "enum": [
+                "llm",
+                "supplement_rule",
+                "targeted_retrieval",
+                "deterministic"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Evidence Recovered By"
+        },
+        "retrieval_score": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Retrieval Score"
+        }
+      },
+      "required": [
+        "chunk_id",
+        "snippet"
+      ],
+      "title": "Citation",
+      "type": "object"
+    },
+    "Finding": {
+      "additionalProperties": false,
+      "properties": {
+        "check_id": {
+          "title": "Check Id",
+          "type": "string"
+        },
+        "area": {
+          "title": "Area",
+          "type": "string"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        },
+        "severity": {
+          "enum": [
+            "low",
+            "medium",
+            "high",
+            "critical"
+          ],
+          "title": "Severity",
+          "type": "string"
+        },
+        "evidence_status": {
+          "enum": [
+            "present",
+            "not_provided_in_sources",
+            "explicitly_missing",
+            "not_assessed"
+          ],
+          "title": "Evidence Status",
+          "type": "string"
+        },
+        "retrieval_status": {
+          "anyOf": [
+            {
+              "enum": [
+                "MENTIONED_EXPLICIT",
+                "MENTIONED_IMPLICIT",
+                "MENTIONED_AMBIGUOUS",
+                "NOT_FOUND_IN_RETRIEVED",
+                "NOT_RETRIEVED"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Retrieval Status"
+        },
+        "needs_confirmation": {
+          "default": false,
+          "title": "Needs Confirmation",
+          "type": "boolean"
+        },
+        "is_threshold_prompt": {
+          "default": false,
+          "title": "Is Threshold Prompt",
+          "type": "boolean"
+        },
+        "stage_reason": {
+          "title": "Stage Reason",
+          "type": "string"
+        },
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/Citation"
+          },
+          "title": "Evidence",
+          "type": "array"
+        },
+        "subchecks": {
+          "items": {
+            "$ref": "#/$defs/Subcheck"
+          },
+          "title": "Subchecks",
+          "type": "array"
+        },
+        "actions": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Actions",
+          "type": "array"
+        },
+        "owner": {
+          "default": "TBD / assign (e.g., HR/People, Finance, Ops)",
+          "title": "Owner",
+          "type": "string"
+        },
+        "metrics": {
+          "items": {
+            "$ref": "#/$defs/MetricItem"
+          },
+          "title": "Metrics",
+          "type": "array"
+        },
+        "questions": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Questions",
+          "type": "array"
+        },
+        "score": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Score"
+        }
+      },
+      "required": [
+        "check_id",
+        "area",
+        "title",
+        "severity",
+        "evidence_status",
+        "stage_reason"
+      ],
+      "title": "Finding",
+      "type": "object"
+    },
+    "MetricItem": {
+      "additionalProperties": false,
+      "properties": {
+        "metric": {
+          "title": "Metric",
+          "type": "string"
+        },
+        "value": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Value"
+        },
+        "status": {
+          "enum": [
+            "found",
+            "unknown"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/Citation"
+          },
+          "title": "Evidence",
+          "type": "array"
+        }
+      },
+      "required": [
+        "metric",
+        "status"
+      ],
+      "title": "MetricItem",
+      "type": "object"
+    },
+    "Plan3090": {
+      "additionalProperties": false,
+      "properties": {
+        "why_now": {
+          "title": "Why Now",
+          "type": "string"
+        },
+        "days_30": {
+          "items": {
+            "$ref": "#/$defs/PlanAction"
+          },
+          "title": "Days 30",
+          "type": "array"
+        },
+        "days_60": {
+          "items": {
+            "$ref": "#/$defs/PlanAction"
+          },
+          "title": "Days 60",
+          "type": "array"
+        },
+        "days_90": {
+          "items": {
+            "$ref": "#/$defs/PlanAction"
+          },
+          "title": "Days 90",
+          "type": "array"
+        }
+      },
+      "required": [
+        "why_now"
+      ],
+      "title": "Plan3090",
+      "type": "object"
+    },
+    "PlanAction": {
+      "additionalProperties": false,
+      "properties": {
+        "action": {
+          "title": "Action",
+          "type": "string"
+        },
+        "rationale": {
+          "title": "Rationale",
+          "type": "string"
+        },
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/Citation"
+          },
+          "title": "Evidence",
+          "type": "array"
+        }
+      },
+      "required": [
+        "action",
+        "rationale"
+      ],
+      "title": "PlanAction",
+      "type": "object"
+    },
+    "RiskItem": {
+      "additionalProperties": false,
+      "properties": {
+        "category": {
+          "title": "Category",
+          "type": "string"
+        },
+        "severity": {
+          "enum": [
+            "low",
+            "medium",
+            "high",
+            "critical"
+          ],
+          "title": "Severity",
+          "type": "string"
+        },
+        "statement": {
+          "title": "Statement",
+          "type": "string"
+        },
+        "evidence": {
+          "items": {
+            "$ref": "#/$defs/Citation"
+          },
+          "title": "Evidence",
+          "type": "array"
+        },
+        "mitigation": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Mitigation",
+          "type": "array"
+        },
+        "legal_note": {
+          "default": "This is not legal advice; consider reviewing with counsel.",
+          "title": "Legal Note",
+          "type": "string"
+        }
+      },
+      "required": [
+        "category",
+        "severity",
+        "statement"
+      ],
+      "title": "RiskItem",
+      "type": "object"
+    },
+    "Subcheck": {
+      "additionalProperties": false,
+      "properties": {
+        "capability_key": {
+          "title": "Capability Key",
+          "type": "string"
+        },
+        "evidence_status": {
+          "enum": [
+            "present",
+            "not_provided_in_sources",
+            "explicitly_missing",
+            "not_assessed"
+          ],
+          "title": "Evidence Status",
+          "type": "string"
+        },
+        "retrieval_status": {
+          "anyOf": [
+            {
+              "enum": [
+                "MENTIONED_EXPLICIT",
+                "MENTIONED_IMPLICIT",
+                "MENTIONED_AMBIGUOUS",
+                "NOT_FOUND_IN_RETRIEVED",
+                "NOT_RETRIEVED"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Retrieval Status"
+        },
+        "citations": {
+          "items": {
+            "$ref": "#/$defs/Citation"
+          },
+          "title": "Citations",
+          "type": "array"
+        },
+        "missing_reason": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Missing Reason"
+        }
+      },
+      "required": [
+        "capability_key",
+        "evidence_status"
+      ],
+      "title": "Subcheck",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "stage": {
+      "title": "Stage",
+      "type": "string"
+    },
+    "confidence": {
+      "maximum": 1,
+      "minimum": 0,
+      "title": "Confidence",
+      "type": "number"
+    },
+    "drivers": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Drivers",
+      "type": "array"
+    },
+    "top_growth_areas": {
+      "items": {
+        "$ref": "#/$defs/Finding"
+      },
+      "title": "Top Growth Areas",
+      "type": "array"
+    },
+    "risks": {
+      "items": {
+        "$ref": "#/$defs/RiskItem"
+      },
+      "title": "Risks",
+      "type": "array"
+    },
+    "plan_30_60_90": {
+      "$ref": "#/$defs/Plan3090"
+    },
+    "follow_up_questions": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Follow Up Questions",
+      "type": "array"
+    },
+    "unknowns": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Unknowns",
+      "type": "array"
+    },
+    "reviewed_sources": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Reviewed Sources",
+      "type": "array"
+    },
+    "coverage_summary": {
+      "additionalProperties": true,
+      "title": "Coverage Summary",
+      "type": "object"
+    },
+    "retrieval_summary": {
+      "additionalProperties": true,
+      "title": "Retrieval Summary",
+      "type": "object"
+    },
+    "stage_note": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Stage Note"
+    },
+    "coverage_note": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Coverage Note"
+    },
+    "disclaimer": {
+      "default": "This is not legal advice; consider reviewing with counsel.",
+      "title": "Disclaimer",
+      "type": "string"
+    }
+  },
+  "required": [
+    "stage",
+    "confidence",
+    "plan_30_60_90"
+  ],
+  "title": "FinalReport",
+  "type": "object"
+}

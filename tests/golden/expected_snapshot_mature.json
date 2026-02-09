@@ -1,0 +1,85 @@
+{
+  "company_name": "Blue Harbor Services",
+  "headcount": 420,
+  "headcount_range": null,
+  "primary_locations": [],
+  "current_priorities": ["Normalize leveling definitions"],
+  "policies": {
+    "employee_handbook": null,
+    "anti_harassment_policy": null,
+    "leave_policy": null,
+    "overtime_policy": null,
+    "accommodation_policy": null,
+    "data_privacy_policy": null,
+    "disciplinary_policy": null
+  },
+  "hiring": {
+    "structured_interviews": null,
+    "job_architecture": null,
+    "background_checks": null,
+    "offer_approval": null
+  },
+  "onboarding": {
+    "onboarding_program": null,
+    "role_plan_30_60_90": null
+  },
+  "manager_enablement": {
+    "manager_training": true,
+    "one_on_one_cadence": null
+  },
+  "performance": {
+    "review_cycle": null,
+    "goal_framework": null
+  },
+  "comp_leveling": {
+    "pay_bands": true,
+    "leveling_framework": false,
+    "compensation_review_cycle": null
+  },
+  "hris_data": {
+    "hris_system": "BambooHR",
+    "data_audit_cadence": "monthly",
+    "mandatory_training_tracking": null
+  },
+  "er_retention": {
+    "er_case_process": true,
+    "attrition_rate": null,
+    "engagement_survey": null
+  },
+  "benefits": {
+    "benefits_broker": null,
+    "benefits_eligibility_policy": null
+  },
+  "key_risks": [
+    "Leveling inconsistency"
+  ],
+  "evidence_map": {
+    "headcount": {
+      "status": "present",
+      "citations": [
+        {
+          "chunk_id": "doc-001-c001",
+          "snippet": "Headcount: 420 employees."
+        }
+      ]
+    },
+    "hris_data.hris_system": {
+      "status": "present",
+      "citations": [
+        {
+          "chunk_id": "doc-001-c001",
+          "snippet": "HRIS (BambooHR) is the system of record"
+        }
+      ]
+    },
+    "comp_leveling.leveling_framework": {
+      "status": "present",
+      "citations": [
+        {
+          "chunk_id": "doc-001-c001",
+          "snippet": "leveling definitions are still uneven"
+        }
+      ]
+    }
+  }
+}

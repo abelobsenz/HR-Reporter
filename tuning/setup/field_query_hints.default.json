@@ -1,0 +1,274 @@
+{
+  "pack_path": "tuning/packs/default_pack.yaml",
+  "pack_name": "Default HR Growth Pack",
+  "pack_version": "1.0",
+  "tracked_fields": [
+    "policies.employee_handbook",
+    "policies.anti_harassment_policy",
+    "hris_data.mandatory_training_tracking",
+    "policies.leave_policy",
+    "policies.overtime_policy",
+    "hiring.structured_interviews",
+    "hiring.offer_approval",
+    "hiring.job_architecture",
+    "onboarding.onboarding_program",
+    "onboarding.role_plan_30_60_90",
+    "manager_enablement.manager_training",
+    "manager_enablement.one_on_one_cadence",
+    "performance.review_cycle",
+    "performance.goal_framework",
+    "comp_leveling.pay_bands",
+    "comp_leveling.leveling_framework",
+    "hris_data.hris_system",
+    "hris_data.data_audit_cadence",
+    "er_retention.er_case_process",
+    "er_retention.attrition_rate",
+    "er_retention.engagement_survey",
+    "benefits.benefits_eligibility_policy",
+    "benefits.benefits_broker",
+    "company_name",
+    "headcount",
+    "headcount_range",
+    "primary_locations",
+    "current_priorities"
+  ],
+  "field_query_hints": {
+    "policies.employee_handbook": {
+      "check_ids": [
+        "cp_employee_handbook"
+      ],
+      "query_hints": [
+        "Do you have a current employee handbook and last review date?",
+        "Find explicit evidence for current employee handbook. Handbook appears missing or outdated, increasing policy inconsistency risk."
+      ]
+    },
+    "policies.anti_harassment_policy": {
+      "check_ids": [
+        "cp_anti_harassment_training"
+      ],
+      "query_hints": [
+        "Is harassment training completion tracked by employee and location?",
+        "Find explicit evidence for anti-harassment policy and training tracking. Missing policy or training records can create avoidable compliance and ER exposure."
+      ]
+    },
+    "hris_data.mandatory_training_tracking": {
+      "check_ids": [
+        "cp_anti_harassment_training"
+      ],
+      "query_hints": [
+        "Is harassment training completion tracked by employee and location?",
+        "Find explicit evidence for anti-harassment policy and training tracking. Missing policy or training records can create avoidable compliance and ER exposure."
+      ]
+    },
+    "policies.leave_policy": {
+      "check_ids": [
+        "cp_leave_overtime"
+      ],
+      "query_hints": [
+        "Are leave and overtime policies documented and communicated?",
+        "Find explicit evidence for leave and overtime policy coverage. Leave/overtime ambiguity drives wage-hour and leave administration risk."
+      ]
+    },
+    "policies.overtime_policy": {
+      "check_ids": [
+        "cp_leave_overtime"
+      ],
+      "query_hints": [
+        "Are leave and overtime policies documented and communicated?",
+        "Find explicit evidence for leave and overtime policy coverage. Leave/overtime ambiguity drives wage-hour and leave administration risk."
+      ]
+    },
+    "hiring.structured_interviews": {
+      "check_ids": [
+        "hiring_structured_process"
+      ],
+      "query_hints": [
+        "Are interview rubrics and approvals consistently used?",
+        "Find explicit evidence for structured hiring process. Unstructured hiring can reduce quality and increase bias risk as volume grows."
+      ]
+    },
+    "hiring.offer_approval": {
+      "check_ids": [
+        "hiring_structured_process"
+      ],
+      "query_hints": [
+        "Are interview rubrics and approvals consistently used?",
+        "Find explicit evidence for structured hiring process. Unstructured hiring can reduce quality and increase bias risk as volume grows."
+      ]
+    },
+    "hiring.job_architecture": {
+      "check_ids": [
+        "hiring_job_architecture"
+      ],
+      "query_hints": [
+        "Do you maintain a formal job architecture by level?",
+        "Find explicit evidence for job architecture clarity. Role ambiguity creates leveling and compensation inconsistency."
+      ]
+    },
+    "onboarding.onboarding_program": {
+      "check_ids": [
+        "onboarding_program"
+      ],
+      "query_hints": [
+        "Is onboarding standardized across teams?",
+        "Find explicit evidence for standardized onboarding program. Inconsistent onboarding slows productivity and increases early attrition risk."
+      ]
+    },
+    "onboarding.role_plan_30_60_90": {
+      "check_ids": [
+        "onboarding_role_plan"
+      ],
+      "query_hints": [
+        "Do new hires receive role-specific 30/60/90 expectations?",
+        "Find explicit evidence for role-level 30/60/90 plans. Missing role plans weaken manager alignment and time-to-productivity."
+      ]
+    },
+    "manager_enablement.manager_training": {
+      "check_ids": [
+        "mgr_training"
+      ],
+      "query_hints": [
+        "Is manager training mandatory and completion-tracked?",
+        "Find explicit evidence for manager basics training. Untrained managers increase performance, ER, and retention volatility."
+      ]
+    },
+    "manager_enablement.one_on_one_cadence": {
+      "check_ids": [
+        "mgr_1on1"
+      ],
+      "query_hints": [
+        "What is your expected 1:1 cadence for people managers?",
+        "Find explicit evidence for one-on-one cadence. Irregular manager check-ins reduce coaching quality and issue detection."
+      ]
+    },
+    "performance.review_cycle": {
+      "check_ids": [
+        "perf_review_cycle"
+      ],
+      "query_hints": [
+        "Is there a documented performance review cycle?",
+        "Find explicit evidence for performance review cycle. No review cadence weakens accountability and development planning."
+      ]
+    },
+    "performance.goal_framework": {
+      "check_ids": [
+        "perf_goals"
+      ],
+      "query_hints": [
+        "Do teams use a consistent goal framework?",
+        "Find explicit evidence for goal framework. Without explicit goals, performance conversations and prioritization drift."
+      ]
+    },
+    "comp_leveling.pay_bands": {
+      "check_ids": [
+        "comp_bands_levels"
+      ],
+      "query_hints": [
+        "Are pay bands and level definitions documented?",
+        "Find explicit evidence for pay bands and leveling framework. Missing pay/level structure increases equity and retention risk."
+      ]
+    },
+    "comp_leveling.leveling_framework": {
+      "check_ids": [
+        "comp_bands_levels"
+      ],
+      "query_hints": [
+        "Are pay bands and level definitions documented?",
+        "Find explicit evidence for pay bands and leveling framework. Missing pay/level structure increases equity and retention risk."
+      ]
+    },
+    "hris_data.hris_system": {
+      "check_ids": [
+        "hris_source_of_truth"
+      ],
+      "query_hints": [
+        "What HRIS is system-of-record and how often is data audited?",
+        "Find explicit evidence for hris source of truth and data audits. Fragmented HR data reduces reporting accuracy and compliance readiness."
+      ]
+    },
+    "hris_data.data_audit_cadence": {
+      "check_ids": [
+        "hris_source_of_truth"
+      ],
+      "query_hints": [
+        "What HRIS is system-of-record and how often is data audited?",
+        "Find explicit evidence for hris source of truth and data audits. Fragmented HR data reduces reporting accuracy and compliance readiness."
+      ]
+    },
+    "er_retention.er_case_process": {
+      "check_ids": [
+        "er_case_process"
+      ],
+      "query_hints": [
+        "Is there a formal ER case process and documentation standard?",
+        "Find explicit evidence for employee relations case process. Lack of ER intake/escalation process increases legal and culture risk."
+      ]
+    },
+    "er_retention.attrition_rate": {
+      "check_ids": [
+        "retention_signals"
+      ],
+      "query_hints": [
+        "Do you track voluntary attrition and engagement trends?",
+        "Find explicit evidence for retention and engagement signals. No attrition/engagement signals limits proactive retention planning."
+      ]
+    },
+    "er_retention.engagement_survey": {
+      "check_ids": [
+        "retention_signals"
+      ],
+      "query_hints": [
+        "Do you track voluntary attrition and engagement trends?",
+        "Find explicit evidence for retention and engagement signals. No attrition/engagement signals limits proactive retention planning."
+      ]
+    },
+    "benefits.benefits_eligibility_policy": {
+      "check_ids": [
+        "benefits_foundation"
+      ],
+      "query_hints": [
+        "Are benefits eligibility rules and vendor ownership documented?",
+        "Find explicit evidence for benefits eligibility and vendor governance. Undefined benefits rules create employee confusion and administration risk."
+      ]
+    },
+    "benefits.benefits_broker": {
+      "check_ids": [
+        "benefits_foundation"
+      ],
+      "query_hints": [
+        "Are benefits eligibility rules and vendor ownership documented?",
+        "Find explicit evidence for benefits eligibility and vendor governance. Undefined benefits rules create employee confusion and administration risk."
+      ]
+    },
+    "company_name": {
+      "check_ids": [],
+      "query_hints": [
+        "Find explicit company or legal-entity name in body text."
+      ]
+    },
+    "headcount": {
+      "check_ids": [],
+      "query_hints": [
+        "Find explicit employee count statements (e.g., \"Headcount is 62\")."
+      ]
+    },
+    "headcount_range": {
+      "check_ids": [],
+      "query_hints": [
+        "Find explicit range expressions (e.g., \"101-250\", \"500+\")."
+      ]
+    },
+    "primary_locations": {
+      "check_ids": [],
+      "query_hints": [
+        "Find explicit location mentions (state/country/city)."
+      ]
+    },
+    "current_priorities": {
+      "check_ids": [],
+      "query_hints": [
+        "Find explicit stated priorities, initiatives, or strategic focus areas."
+      ]
+    }
+  }
+}

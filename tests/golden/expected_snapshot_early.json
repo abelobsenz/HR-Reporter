@@ -1,0 +1,95 @@
+{
+  "company_name": "Acorn Labs",
+  "headcount": 18,
+  "headcount_range": null,
+  "primary_locations": ["Austin, TX"],
+  "current_priorities": ["Hiring engineers", "Improve onboarding consistency"],
+  "policies": {
+    "employee_handbook": true,
+    "anti_harassment_policy": true,
+    "leave_policy": false,
+    "overtime_policy": false,
+    "accommodation_policy": null,
+    "data_privacy_policy": null,
+    "disciplinary_policy": null
+  },
+  "hiring": {
+    "structured_interviews": null,
+    "job_architecture": null,
+    "background_checks": null,
+    "offer_approval": null
+  },
+  "onboarding": {
+    "onboarding_program": false,
+    "role_plan_30_60_90": false
+  },
+  "manager_enablement": {
+    "manager_training": false,
+    "one_on_one_cadence": null
+  },
+  "performance": {
+    "review_cycle": null,
+    "goal_framework": null
+  },
+  "comp_leveling": {
+    "pay_bands": null,
+    "leveling_framework": null,
+    "compensation_review_cycle": null
+  },
+  "hris_data": {
+    "hris_system": null,
+    "data_audit_cadence": null,
+    "mandatory_training_tracking": null
+  },
+  "er_retention": {
+    "er_case_process": null,
+    "attrition_rate": null,
+    "engagement_survey": null
+  },
+  "benefits": {
+    "benefits_broker": null,
+    "benefits_eligibility_policy": null
+  },
+  "key_risks": [
+    "Overtime policy gap",
+    "No manager training baseline"
+  ],
+  "evidence_map": {
+    "headcount": {
+      "status": "present",
+      "citations": [
+        {
+          "chunk_id": "doc-001-c001",
+          "snippet": "Team size is 18 full-time employees in Austin."
+        }
+      ]
+    },
+    "policies.overtime_policy": {
+      "status": "present",
+      "citations": [
+        {
+          "chunk_id": "doc-001-c001",
+          "snippet": "We do not have a formal overtime policy yet."
+        }
+      ]
+    },
+    "manager_enablement.manager_training": {
+      "status": "present",
+      "citations": [
+        {
+          "chunk_id": "doc-001-c001",
+          "snippet": "no manager training program exists"
+        }
+      ]
+    },
+    "onboarding.role_plan_30_60_90": {
+      "status": "present",
+      "citations": [
+        {
+          "chunk_id": "doc-001-c001",
+          "snippet": "no documented 30/60/90 plans"
+        }
+      ]
+    }
+  }
+}

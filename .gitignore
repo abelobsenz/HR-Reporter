@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+out/
+data/input_requests/*
+!data/input_requests/.gitkeep
+.DS_Store
+.env
+!.env.example

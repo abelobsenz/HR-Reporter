@@ -1,0 +1,95 @@
+{
+  "company_name": "North Ridge Systems",
+  "headcount": null,
+  "headcount_range": "around 135",
+  "primary_locations": ["New York", "California"],
+  "current_priorities": ["Standardize hiring", "Stabilize performance management"],
+  "policies": {
+    "employee_handbook": true,
+    "anti_harassment_policy": true,
+    "leave_policy": null,
+    "overtime_policy": null,
+    "accommodation_policy": null,
+    "data_privacy_policy": null,
+    "disciplinary_policy": null
+  },
+  "hiring": {
+    "structured_interviews": false,
+    "job_architecture": null,
+    "background_checks": null,
+    "offer_approval": false
+  },
+  "onboarding": {
+    "onboarding_program": null,
+    "role_plan_30_60_90": null
+  },
+  "manager_enablement": {
+    "manager_training": null,
+    "one_on_one_cadence": null
+  },
+  "performance": {
+    "review_cycle": "annual",
+    "goal_framework": false
+  },
+  "comp_leveling": {
+    "pay_bands": null,
+    "leveling_framework": null,
+    "compensation_review_cycle": null
+  },
+  "hris_data": {
+    "hris_system": null,
+    "data_audit_cadence": null,
+    "mandatory_training_tracking": null
+  },
+  "er_retention": {
+    "er_case_process": null,
+    "attrition_rate": "14%",
+    "engagement_survey": false
+  },
+  "benefits": {
+    "benefits_broker": null,
+    "benefits_eligibility_policy": null
+  },
+  "key_risks": [
+    "Hiring consistency",
+    "No engagement survey"
+  ],
+  "evidence_map": {
+    "headcount_range": {
+      "status": "present",
+      "citations": [
+        {
+          "chunk_id": "doc-001-c001",
+          "snippet": "The company has around 135 employees"
+        }
+      ]
+    },
+    "hiring.structured_interviews": {
+      "status": "present",
+      "citations": [
+        {
+          "chunk_id": "doc-001-c001",
+          "snippet": "Structured interviews are inconsistent"
+        }
+      ]
+    },
+    "er_retention.attrition_rate": {
+      "status": "present",
+      "citations": [
+        {
+          "chunk_id": "doc-001-c001",
+          "snippet": "Attrition is tracked monthly at 14%"
+        }
+      ]
+    },
+    "er_retention.engagement_survey": {
+      "status": "present",
+      "citations": [
+        {
+          "chunk_id": "doc-001-c001",
+          "snippet": "there is no engagement survey"
+        }
+      ]
+    }
+  }
+}

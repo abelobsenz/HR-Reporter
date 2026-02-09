@@ -1,0 +1,673 @@
+{
+  "$defs": {
+    "Benefits": {
+      "additionalProperties": false,
+      "properties": {
+        "benefits_broker": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Benefits Broker"
+        },
+        "benefits_eligibility_policy": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Benefits Eligibility Policy"
+        }
+      },
+      "title": "Benefits",
+      "type": "object"
+    },
+    "Citation": {
+      "additionalProperties": false,
+      "properties": {
+        "chunk_id": {
+          "title": "Chunk Id",
+          "type": "string"
+        },
+        "snippet": {
+          "title": "Snippet",
+          "type": "string"
+        },
+        "source_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Id"
+        },
+        "doc_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Doc Id"
+        },
+        "start_char": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Start Char"
+        },
+        "end_char": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "End Char"
+        },
+        "evidence_recovered_by": {
+          "anyOf": [
+            {
+              "enum": [
+                "llm",
+                "supplement_rule",
+                "targeted_retrieval",
+                "deterministic"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Evidence Recovered By"
+        },
+        "retrieval_score": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Retrieval Score"
+        }
+      },
+      "required": [
+        "chunk_id",
+        "snippet"
+      ],
+      "title": "Citation",
+      "type": "object"
+    },
+    "CompLeveling": {
+      "additionalProperties": false,
+      "properties": {
+        "pay_bands": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pay Bands"
+        },
+        "leveling_framework": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Leveling Framework"
+        },
+        "compensation_review_cycle": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Compensation Review Cycle"
+        }
+      },
+      "title": "CompLeveling",
+      "type": "object"
+    },
+    "ERRetention": {
+      "additionalProperties": false,
+      "properties": {
+        "er_case_process": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Er Case Process"
+        },
+        "attrition_rate": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Attrition Rate"
+        },
+        "engagement_survey": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Engagement Survey"
+        }
+      },
+      "title": "ERRetention",
+      "type": "object"
+    },
+    "EvidenceStatus": {
+      "additionalProperties": false,
+      "properties": {
+        "status": {
+          "enum": [
+            "present",
+            "not_provided_in_sources",
+            "explicitly_missing",
+            "not_assessed"
+          ],
+          "title": "Status",
+          "type": "string"
+        },
+        "retrieval_status": {
+          "anyOf": [
+            {
+              "enum": [
+                "MENTIONED_EXPLICIT",
+                "MENTIONED_IMPLICIT",
+                "MENTIONED_AMBIGUOUS",
+                "NOT_FOUND_IN_RETRIEVED",
+                "NOT_RETRIEVED"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Retrieval Status"
+        },
+        "coverage_note": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Coverage Note"
+        },
+        "retrieval_queries": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Retrieval Queries",
+          "type": "array"
+        },
+        "match_count": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Match Count",
+          "type": "integer"
+        },
+        "citations": {
+          "items": {
+            "$ref": "#/$defs/Citation"
+          },
+          "title": "Citations",
+          "type": "array"
+        }
+      },
+      "required": [
+        "status"
+      ],
+      "title": "EvidenceStatus",
+      "type": "object"
+    },
+    "HRISData": {
+      "additionalProperties": false,
+      "properties": {
+        "hris_system": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Hris System"
+        },
+        "data_audit_cadence": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Data Audit Cadence"
+        },
+        "mandatory_training_tracking": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Mandatory Training Tracking"
+        }
+      },
+      "title": "HRISData",
+      "type": "object"
+    },
+    "Hiring": {
+      "additionalProperties": false,
+      "properties": {
+        "structured_interviews": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Structured Interviews"
+        },
+        "job_architecture": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Job Architecture"
+        },
+        "background_checks": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Background Checks"
+        },
+        "offer_approval": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Offer Approval"
+        }
+      },
+      "title": "Hiring",
+      "type": "object"
+    },
+    "ManagerEnablement": {
+      "additionalProperties": false,
+      "properties": {
+        "manager_training": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Manager Training"
+        },
+        "one_on_one_cadence": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "One On One Cadence"
+        }
+      },
+      "title": "ManagerEnablement",
+      "type": "object"
+    },
+    "Onboarding": {
+      "additionalProperties": false,
+      "properties": {
+        "onboarding_program": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Onboarding Program"
+        },
+        "role_plan_30_60_90": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Role Plan 30 60 90"
+        }
+      },
+      "title": "Onboarding",
+      "type": "object"
+    },
+    "Performance": {
+      "additionalProperties": false,
+      "properties": {
+        "review_cycle": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Review Cycle"
+        },
+        "goal_framework": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Goal Framework"
+        }
+      },
+      "title": "Performance",
+      "type": "object"
+    },
+    "Policies": {
+      "additionalProperties": false,
+      "properties": {
+        "employee_handbook": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Employee Handbook"
+        },
+        "anti_harassment_policy": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Anti Harassment Policy"
+        },
+        "leave_policy": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Leave Policy"
+        },
+        "overtime_policy": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Overtime Policy"
+        },
+        "accommodation_policy": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Accommodation Policy"
+        },
+        "data_privacy_policy": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Data Privacy Policy"
+        },
+        "disciplinary_policy": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Disciplinary Policy"
+        }
+      },
+      "title": "Policies",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "company_name": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Company Name"
+    },
+    "headcount": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Headcount"
+    },
+    "headcount_range": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Headcount Range"
+    },
+    "primary_locations": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Primary Locations",
+      "type": "array"
+    },
+    "current_priorities": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Current Priorities",
+      "type": "array"
+    },
+    "policies": {
+      "$ref": "#/$defs/Policies"
+    },
+    "hiring": {
+      "$ref": "#/$defs/Hiring"
+    },
+    "onboarding": {
+      "$ref": "#/$defs/Onboarding"
+    },
+    "manager_enablement": {
+      "$ref": "#/$defs/ManagerEnablement"
+    },
+    "performance": {
+      "$ref": "#/$defs/Performance"
+    },
+    "comp_leveling": {
+      "$ref": "#/$defs/CompLeveling"
+    },
+    "hris_data": {
+      "$ref": "#/$defs/HRISData"
+    },
+    "er_retention": {
+      "$ref": "#/$defs/ERRetention"
+    },
+    "benefits": {
+      "$ref": "#/$defs/Benefits"
+    },
+    "key_risks": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Key Risks",
+      "type": "array"
+    },
+    "evidence_map": {
+      "additionalProperties": {
+        "$ref": "#/$defs/EvidenceStatus"
+      },
+      "title": "Evidence Map",
+      "type": "object"
+    }
+  },
+  "title": "CompanyPeopleSnapshot",
+  "type": "object"
+}

@@ -1,0 +1,350 @@
+from __future__ import annotations
+
+import re
+from typing import List, Optional, Tuple
+import logging
+
+from app.models import (
+    Citation,
+    CompanyPeopleSnapshot,
+    ConsultantPack,
+    StageBand,
+    StageCandidate,
+    StageInferenceResult,
+    TextChunk,
+)
+
+logger = logging.getLogger(__name__)
+S5_PROXY_TERMS = [
+    "global entities",
+    "global",
+    "multi-country",
+    "international",
+    "board",
+    "investor relations",
+    " ir ",
+    "workday",
+]
+
+HEADCOUNT_CONTEXT_TERMS = {
+    "headcount",
+    "employees",
+    "employee",
+    "workforce",
+    "staff",
+    "fte",
+    "full-time",
+    "team members",
+}
+
+HEADCOUNT_RANGE_RE = re.compile(r"\b(\d{1,5})\s*(?:-|to)\s*(\d{1,5})\b", flags=re.IGNORECASE)
+HEADCOUNT_PLUS_RE = re.compile(r"\b(\d{1,5})\s*\+")
+HEADCOUNT_EXPLICIT_RE = re.compile(
+    r"\bheadcount\s*(?:is|=|:|at)?\s*(?:about|around|approximately|~)?\s*(\d{2,5})\b",
+    flags=re.IGNORECASE,
+)
+HEADCOUNT_EMPLOYEE_RE = re.compile(
+    r"\b(\d{2,5})\s*(employees|employee|fte|team members)\b",
+    flags=re.IGNORECASE,
+)
+HEADCOUNT_RANGE_CONTEXT_RE = re.compile(
+    r"\b(?:headcount|employees|employee|fte|team members)\b.*?\b(\d{2,5})\s*(?:-|to)\s*(\d{2,5})\b",
+    flags=re.IGNORECASE,
+)
+HEADCOUNT_PLUS_CONTEXT_RE = re.compile(
+    r"\b(?:headcount|employees|employee|fte|team members)\b.*?\b(\d{2,5})\s*\+",
+    flags=re.IGNORECASE,
+)
+NON_HEADCOUNT_NUMBER_PATTERNS = [
+    re.compile(r"\b30\s*/\s*60\s*/\s*90\b"),
+    re.compile(r"\b\d+\s*(day|days|week|weeks|month|months)\b"),
+    re.compile(r"\bnotice\b"),
+]
+
+
+def _stage_for_headcount(headcount: int, stages: List[StageBand]) -> Optional[StageBand]:
+    for stage in sorted(stages, key=lambda s: s.min_headcount):
+        if stage.max_headcount is None:
+            if headcount >= stage.min_headcount:
+                return stage
+        elif stage.min_headcount <= headcount <= stage.max_headcount:
+            return stage
+    return None
+
+
+def _highest_stage(stages: List[StageBand]) -> StageBand:
+    return sorted(stages, key=lambda s: s.min_headcount)[-1]
+
+
+def _parse_headcount_range(value: str) -> Optional[Tuple[int, int | None]]:
+    text = value.strip()
+    if not text:
+        return None
+
+    range_match = re.search(r"(\d{1,5})\s*(?:-|to)\s*(\d{1,5})", text, flags=re.IGNORECASE)
+    if range_match:
+        lo = int(range_match.group(1))
+        hi = int(range_match.group(2))
+        return (min(lo, hi), max(lo, hi))
+
+    plus_match = re.search(r"(\d{1,5})\s*\+", text)
+    if plus_match:
+        lo = int(plus_match.group(1))
+        return (lo, None)
+
+    single_match = re.search(r"(\d{1,5})", text)
+    if single_match:
+        num = int(single_match.group(1))
+        return (num, num)
+
+    return None
+
+
+def _signals_from_snapshot_and_chunks(snapshot: CompanyPeopleSnapshot, chunks: List[TextChunk] | None) -> List[str]:
+    source_text = " ".join(
+        [snapshot.company_name or ""]
+        + snapshot.current_priorities
+        + snapshot.key_risks
+        + [c.text for c in (chunks or [])]
+    ).lower()
+
+    signals: List[str] = []
+    for term in S5_PROXY_TERMS:
+        if term in source_text:
+            signals.append(term)
+
+    locations = [loc.lower() for loc in snapshot.primary_locations]
+    if len({loc.strip() for loc in locations if loc.strip()}) >= 2:
+        signals.append("multi-state")
+
+    non_us_terms = [
+        "canada",
+        "uk",
+        "united kingdom",
+        "germany",
+        "france",
+        "india",
+        "singapore",
+        "australia",
+        "japan",
+        "mexico",
+        "brazil",
+        "emea",
+        "apac",
+        "latam",
+    ]
+    if any(any(term in loc for term in non_us_terms) for loc in locations):
+        signals.append("multi-country")
+
+    return sorted(set(signals))
+
+
+def _signals_imply_s5(signals: List[str], drivers: List[str]) -> bool:
+    signal_match = any(
+        term in signals
+        for term in [
+            "global entities",
+            "global",
+            "multi-country",
+            "board",
+            "investor relations",
+            "workday",
+        ]
+    )
+    driver_match = any("500+ characteristics" in driver.lower() or "s5" in driver.lower() for driver in drivers)
+    return signal_match or driver_match
+
+
+def _candidate(stage: StageBand, confidence: float, drivers: List[str], signals: List[str]) -> StageCandidate:
+    return StageCandidate(stage_id=stage.id, confidence=confidence, drivers=drivers, signals=signals)
+
+
+def _split_sentences(text: str) -> List[str]:
+    return [part.strip() for part in re.split(r"(?<=[.!?])\s+", text) if part.strip()]
+
+
+def _infer_from_chunks(
+    *,
+    chunks: List[TextChunk] | None,
+    stages: List[StageBand],
+) -> Tuple[StageBand | None, float, List[str], List[Citation], bool]:
+    if not chunks:
+        return None, 0.0, [], [], False
+
+    best_stage: StageBand | None = None
+    best_confidence = 0.0
+    best_drivers: List[str] = []
+    best_citations: List[Citation] = []
+    explicit = False
+
+    for chunk in chunks:
+        for sentence in _split_sentences(chunk.text):
+            lower = sentence.lower()
+            if any(pattern.search(lower) for pattern in NON_HEADCOUNT_NUMBER_PATTERNS):
+                continue
+            if not any(term in lower for term in HEADCOUNT_CONTEXT_TERMS):
+                continue
+
+            range_match = HEADCOUNT_RANGE_CONTEXT_RE.search(lower) or HEADCOUNT_RANGE_RE.search(lower)
+            if range_match:
+                lo = int(range_match.group(1))
+                hi = int(range_match.group(2))
+                pivot = round((lo + hi) / 2)
+                stage = _stage_for_headcount(pivot, stages)
+                if stage and 0.74 > best_confidence:
+                    best_stage = stage
+                    best_confidence = 0.74
+                    best_drivers = [f"Headcount range extracted from source text: {lo}-{hi}."]
+                    best_citations = [Citation(chunk_id=chunk.chunk_id, snippet=sentence)]
+                    explicit = True
+                continue
+
+            plus_match = HEADCOUNT_PLUS_CONTEXT_RE.search(lower) or HEADCOUNT_PLUS_RE.search(lower)
+            if plus_match:
+                lo = int(plus_match.group(1))
+                stage = _stage_for_headcount(lo, stages)
+                if stage and 0.7 > best_confidence:
+                    best_stage = stage
+                    best_confidence = 0.7
+                    best_drivers = [f"Headcount lower-bound extracted from source text: {lo}+"]
+                    best_citations = [Citation(chunk_id=chunk.chunk_id, snippet=sentence)]
+                    explicit = True
+                continue
+
+            explicit_match = HEADCOUNT_EXPLICIT_RE.search(lower)
+            employee_match = HEADCOUNT_EMPLOYEE_RE.search(lower)
+            value_match = explicit_match or employee_match
+            if value_match:
+                value = int(value_match.group(1))
+                stage = _stage_for_headcount(value, stages)
+                if stage and 0.78 > best_confidence:
+                    best_stage = stage
+                    best_confidence = 0.78
+                    best_drivers = [f"Headcount extracted from source text: {value}."]
+                    best_citations = [Citation(chunk_id=chunk.chunk_id, snippet=sentence)]
+                    explicit = True
+
+    return best_stage, best_confidence, best_drivers, best_citations, explicit
+
+
+def infer_stage(
+    *,
+    snapshot: CompanyPeopleSnapshot,
+    pack: ConsultantPack,
+    chunks: List[TextChunk] | None = None,
+) -> StageInferenceResult:
+    stages_sorted = sorted(pack.stages, key=lambda s: s.min_headcount)
+    candidates: List[StageCandidate] = []
+    signals = _signals_from_snapshot_and_chunks(snapshot, chunks)
+
+    selected: StageBand | None = None
+    confidence = 0.3
+    drivers: List[str] = []
+    source = "unknown"
+    explicit_headcount_evidence = False
+    stage_evidence = []
+
+    if snapshot.headcount is not None:
+        stage = _stage_for_headcount(snapshot.headcount, pack.stages)
+        if stage:
+            selected = stage
+            confidence = 0.92
+            drivers = [f"Headcount explicitly stated as {snapshot.headcount}."]
+            source = "rules"
+            explicit_headcount_evidence = True
+            candidates.append(_candidate(stage, confidence, drivers, signals))
+
+    if selected is None and snapshot.headcount_range:
+        parsed = _parse_headcount_range(snapshot.headcount_range)
+        if parsed:
+            lo, hi = parsed
+            pivot = lo if hi is None else round((lo + hi) / 2)
+            stage = _stage_for_headcount(pivot, pack.stages)
+            if stage:
+                selected = stage
+                confidence = 0.72
+                drivers = [f"Headcount range signal found: {snapshot.headcount_range}."]
+                source = "rules"
+                explicit_headcount_evidence = True
+                candidates.append(_candidate(stage, confidence, drivers, signals))
+
+    if selected is None:
+        (
+            chunk_stage,
+            chunk_confidence,
+            chunk_drivers,
+            chunk_evidence,
+            chunk_explicit,
+        ) = _infer_from_chunks(chunks=chunks, stages=pack.stages)
+        if chunk_stage is not None:
+            selected = chunk_stage
+            confidence = chunk_confidence
+            drivers = chunk_drivers
+            source = "rules"
+            stage_evidence = chunk_evidence
+            explicit_headcount_evidence = chunk_explicit
+            candidates.append(_candidate(chunk_stage, confidence, drivers, signals))
+
+    if selected is None:
+        selected = stages_sorted[0]
+        confidence = 0.3
+        drivers = ["No reliable headcount signal found."]
+        source = "unknown"
+        candidates.append(_candidate(selected, confidence, drivers, signals))
+
+    note: str | None = None
+    stage_min = selected
+    stage_max = selected
+    highest = _highest_stage(pack.stages)
+    if not explicit_headcount_evidence and selected.id == highest.id:
+        # Avoid definitive top-stage assignment from proxies/inference alone.
+        if len(stages_sorted) > 1:
+            stage_min = stages_sorted[-2]
+            selected = stage_min
+            drivers = drivers + ["Top-stage capped without explicit headcount evidence."]
+            confidence = max(0.22, confidence - 0.1)
+            note = "Stage inferred from proxies; explicit headcount not found."
+        stage_max = highest
+
+    if _signals_imply_s5(signals, drivers) and not explicit_headcount_evidence:
+        stage_max = highest
+        confidence = max(0.25, confidence - 0.08)
+        drivers = drivers + ["Upper-bound stage expanded by proxy complexity signals."]
+        note = "Stage inferred from proxies; explicit headcount not found."
+
+    # Consistency validation against candidates/signals.
+    for candidate in candidates:
+        candidate_stage = next((s for s in pack.stages if s.id == candidate.stage_id), None)
+        if not candidate_stage:
+            continue
+        if candidate_stage.min_headcount > selected.min_headcount and source != "rules":
+            confidence = max(0.2, confidence - 0.08)
+            if note is None:
+                note = "Stage inferred from proxies; explicit headcount not found."
+
+    result = StageInferenceResult(
+        stage_id=selected.id,
+        stage_label=selected.label,
+        confidence=round(min(1.0, max(0.05, confidence)), 3),
+        stage_min=stage_min.id,
+        stage_max=stage_max.id,
+        stage_point_estimate=selected.id,
+        stage_confidence=round(min(1.0, max(0.05, confidence)), 3),
+        stage_evidence=stage_evidence,
+        explicit_headcount_evidence=explicit_headcount_evidence,
+        drivers=drivers,
+        signals=signals,
+        candidates=candidates,
+        note=note,
+        source=source,
+    )
+    logger.info(
+        "stage_inference_done stage=%s confidence=%.3f explicit=%s signals=%s",
+        result.stage_label,
+        result.confidence,
+        result.explicit_headcount_evidence,
+        ",".join(result.signals),
+    )
+    if logger.isEnabledFor(logging.DEBUG):
+        logger.debug("stage_candidates=%s", [c.model_dump() for c in result.candidates])
+    return result
