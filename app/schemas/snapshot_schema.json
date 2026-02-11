@@ -222,6 +222,7 @@
         "status": {
           "enum": [
             "present",
+            "ambiguous",
             "not_provided_in_sources",
             "explicitly_missing",
             "not_assessed"

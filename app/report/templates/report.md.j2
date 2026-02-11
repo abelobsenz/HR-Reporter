@@ -5,6 +5,10 @@
 |---|---|---|---|
 | {{ profile_name }} | {{ (report.company_stage or report.stage)|replace('|', '/') }} | {{ (report.size_stage or report.stage)|replace('|', '/') }} | {{ (report.funding_stage or 'Not explicitly stated')|replace('|', '/') }} |
 
+{% if report.stage_confidence is not none %}
+**Stage confidence:** {{ "%.2f"|format(report.stage_confidence) }}{% if report.stage_provisional %} (Provisional){% endif %}
+{% endif %}
+
 {% if report.stage_note %}
 **Stage note:** {{ report.stage_note }}
 {% endif %}
@@ -13,6 +17,27 @@
 ### Why This Stage
 {% for driver in report.drivers %}
 - {{ driver }}
+{% endfor %}
+{% endif %}
+
+{% if report.signals_used %}
+### Signals Used
+{% for signal in report.signals_used %}
+- {{ signal }}
+{% endfor %}
+{% endif %}
+
+{% if report.signals_missing %}
+### Signals Missing
+{% for signal in report.signals_missing %}
+- {{ signal }}
+{% endfor %}
+{% endif %}
+
+{% if report.alternate_stage_candidates %}
+### Alternate Stage Candidates
+{% for item in report.alternate_stage_candidates %}
+- {{ item }}
 {% endfor %}
 {% endif %}
 
@@ -132,7 +157,15 @@ No stage-based recommendation was generated.
 - `{{ citation.chunk_id }}` {{ citation.snippet }}
 {% endfor %}
 {% else %}
-**Evidence:** Not explicitly confirmed in reviewed sources.
+{% if finding.evidence_status == 'not_assessed' %}
+**Evidence:** Not assessed due to source retrieval gaps.
+{% elif finding.evidence_status == 'not_provided_in_sources' %}
+**Evidence:** No relevant supporting evidence was found in reviewed sources.
+{% elif finding.evidence_status == 'ambiguous' %}
+**Evidence:** Partial/indirect evidence only; explicit confirmation required.
+{% else %}
+**Evidence:** No supporting evidence captured.
+{% endif %}
 {% endif %}
 
 {% if finding.questions %}
@@ -161,7 +194,11 @@ No rubric concerns were flagged.
 - `{{ citation.chunk_id }}` {{ citation.snippet }}
 {% endfor %}
 {% else %}
-**Evidence:** Hypothesis-level signal only.
+{% if finding.evidence_status == 'ambiguous' %}
+**Evidence:** Hypothesis-level signal only; evidence is indirect.
+{% else %}
+**Evidence:** No explicit supporting evidence was captured.
+{% endif %}
 {% endif %}
 
 {% if finding.questions %}

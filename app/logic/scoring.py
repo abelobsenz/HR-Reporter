@@ -15,7 +15,8 @@ SEVERITY_ORDER = {
 }
 
 EVIDENCE_STATUS_ORDER = {
-    "explicitly_missing": 4,
+    "explicitly_missing": 5,
+    "ambiguous": 4,
     "not_assessed": 3,
     "not_provided_in_sources": 2,
     "present": 1,
@@ -30,10 +31,31 @@ RETRIEVAL_ORDER = {
     None: 0,
 }
 
+
+def _driver_line_from_finding(finding: Finding) -> str:
+    title = finding.title.strip().rstrip(".")
+    area = finding.area.replace("_", " ")
+    if finding.evidence_status == "explicitly_missing":
+        return f"Sources indicate a required control is not in place in {area}."
+    if finding.evidence_status == "ambiguous":
+        return f"Evidence is partial/indirect for a high-priority control in {area}; confirm before finalizing."
+    if finding.evidence_status == "not_provided_in_sources":
+        return f"High-priority control evidence was not found in reviewed sources for {area}."
+    if finding.evidence_status == "not_assessed":
+        return f"Source retrieval coverage was insufficient to assess a high-priority control in {area}."
+    return f"Evidence indicates this control is documented: {title}."
+
+
 def build_growth_drivers(initial_drivers: List[str], findings: List[Finding], top_n: int = 3) -> List[str]:
     drivers = list(initial_drivers)
-    for finding in findings[:top_n]:
-        drivers.append(f"{finding.title} flagged as a {finding.severity} severity risk signal.")
+    contributed = 0
+    for finding in findings:
+        if contributed >= top_n:
+            break
+        if finding.evidence_status == "present" and finding.severity in {"low", "medium"}:
+            continue
+        drivers.append(_driver_line_from_finding(finding))
+        contributed += 1
 
     deduped = []
     seen = set()

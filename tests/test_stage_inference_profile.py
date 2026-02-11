@@ -17,3 +17,12 @@ def test_stage_inference_uses_profile_stages() -> None:
     assert result.stage_id == "100-250"
     assert result.source == "rules"
     assert result.confidence == 1.0
+
+
+def test_stage_inference_includes_missing_signals_and_alternate_candidates_when_uncertain() -> None:
+    profile = load_consultant_profile(REPO_ROOT / "tuning" / "profile.yaml")
+    snapshot = CompanyPeopleSnapshot()
+    result = infer_stage(snapshot=snapshot, profile=profile)
+    assert result.confidence <= 0.68
+    assert "explicit_headcount" in result.signals_missing
+    assert len(result.candidates) >= 2

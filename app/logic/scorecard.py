@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 import re
-from typing import Dict, List
+from typing import Any, Dict, List
 
 from app.models import Finding, FunctionalScorecardItem
 
@@ -47,7 +47,7 @@ def _maturity_from_findings(findings: List[Finding]) -> str:
 
     critical_or_high = [f for f in findings if f.severity in {"critical", "high"}]
     explicit_missing = [f for f in findings if f.evidence_status == "explicitly_missing"]
-    unresolved = [f for f in findings if f.evidence_status in {"not_assessed", "not_provided_in_sources"}]
+    unresolved = [f for f in findings if f.evidence_status in {"ambiguous", "not_assessed", "not_provided_in_sources"}]
 
     if any(f.severity in {"critical", "high"} for f in explicit_missing):
         return "Under-Developed"
@@ -77,13 +77,34 @@ def _normalize_area(area: str) -> str:
 
 
 def _label_for_unknown_area(area: str) -> str:
-    cleaned = re.sub(r"[_/]+", " ", area).strip()
-    return cleaned.title() if cleaned else "Other"
+    cleaned = re.sub(r"[_|]+", " / ", area)
+    cleaned = re.sub(r"\s*/\s*", " / ", cleaned)
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+    if not cleaned:
+        return "Other"
+    titled = cleaned.title()
+    titled = re.sub(r"\bHr\b", "HR", titled)
+    titled = re.sub(r"\bDeib\b", "DEIB", titled)
+    titled = re.sub(r"\bSops\b", "SOPs", titled)
+    return titled
+
+
+def _coverage_is_low(coverage_summary: Dict[str, Any] | None) -> bool:
+    if not isinstance(coverage_summary, dict):
+        return True
+    retrieved_chunks = int(coverage_summary.get("retrieved_chunks", 0) or 0)
+    fields_not_retrieved = int(coverage_summary.get("fields_not_retrieved", 0) or 0)
+    fields_not_found = int(coverage_summary.get("fields_not_found", 0) or 0)
+    fields_with_explicit = int(coverage_summary.get("fields_with_explicit", 0) or 0)
+    tracked = fields_not_retrieved + fields_not_found + fields_with_explicit
+    unresolved_ratio = ((fields_not_retrieved + fields_not_found) / tracked) if tracked > 0 else 1.0
+    return retrieved_chunks < 12 or unresolved_ratio > 0.45
 
 
 def build_functional_scorecard(
     *,
     findings: List[Finding],
+    coverage_summary: Dict[str, Any] | None = None,
 ) -> List[FunctionalScorecardItem]:
     findings_by_area: Dict[str, List[Finding]] = defaultdict(list)
     area_labels: Dict[str, str] = {}
@@ -99,22 +120,25 @@ def build_functional_scorecard(
             area_keys.append(area)
 
     rows: List[FunctionalScorecardItem] = []
+    low_coverage = _coverage_is_low(coverage_summary)
     for area in area_keys:
         area_findings = findings_by_area.get(area, [])
 
         impact = _impact_from_findings(area_findings)
         maturity = _maturity_from_findings(area_findings)
+        rationale = f"{len(area_findings)} concern(s) were flagged in this area."
+        if not area_findings and low_coverage:
+            maturity = "Developing"
+            rationale = "No explicit gaps were flagged, but evidence coverage for this area is limited."
+        elif not area_findings:
+            rationale = "No explicit gaps were flagged in reviewed evidence."
 
         rows.append(
             FunctionalScorecardItem(
                 functional_area=area_labels.get(area, AREA_LABELS.get(area, area.replace("_", " ").title())),
                 maturity_level=maturity,
                 impact_level=impact,
-                rationale=(
-                    f"{len(area_findings)} concern(s) were flagged in this area."
-                    if area_findings
-                    else "No explicit gaps were flagged in reviewed evidence."
-                ),
+                rationale=rationale,
             )
         )
 

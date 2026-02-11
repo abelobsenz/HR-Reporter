@@ -5,6 +5,7 @@ import re
 from typing import Any, Dict, List
 import logging
 
+from app.logic.evidence_semantics import evidence_status_requires_confirmation, map_verdict_to_evidence_status
 from app.llm.client import OpenAIResponsesClient
 from app.llm.prompts import DISCOVERY_SYSTEM_PROMPT, build_discovery_user_prompt
 from app.models import Citation, ConsultantProfile, Finding, Subcheck
@@ -238,8 +239,21 @@ def _parse_discovery_payload(*, payload: Dict[str, Any], evidence_catalog: List[
 
         hypothesis = bool(row.get("hypothesis"))
         question = str(row.get("question", "")).strip()
-        evidence_status = "present" if citations else "not_provided_in_sources"
-        needs_confirmation = hypothesis or evidence_status != "present"
+        verdict = "not_found"
+        if citations:
+            verdict = "ambiguous" if hypothesis else "present"
+        elif hypothesis:
+            verdict = "ambiguous"
+        retrieval_status = "MENTIONED_EXPLICIT" if citations else "NOT_FOUND_IN_RETRIEVED"
+        if hypothesis:
+            retrieval_status = "MENTIONED_AMBIGUOUS" if citations else "NOT_FOUND_IN_RETRIEVED"
+        evidence_status = map_verdict_to_evidence_status(
+            verdict=verdict,
+            retrieval_status=retrieval_status,
+            has_relevant_evidence=bool(citations),
+            analysis_ran=True,
+        )
+        needs_confirmation = evidence_status_requires_confirmation(evidence_status) or hypothesis
 
         findings.append(
             Finding(
@@ -248,7 +262,7 @@ def _parse_discovery_payload(*, payload: Dict[str, Any], evidence_catalog: List[
                 title=str(row.get("title", "Additional observation")),
                 severity=str(row.get("severity", "medium")),
                 evidence_status=evidence_status,
-                retrieval_status=("MENTIONED_EXPLICIT" if citations else "NOT_FOUND_IN_RETRIEVED"),
+                retrieval_status=retrieval_status,
                 needs_confirmation=needs_confirmation,
                 is_threshold_prompt=False,
                 stage_reason=str(row.get("rationale", "Potential additional risk identified.")),
@@ -257,10 +271,12 @@ def _parse_discovery_payload(*, payload: Dict[str, Any], evidence_catalog: List[
                     Subcheck(
                         capability_key=str(row.get("id", "discovery_observation")),
                         evidence_status=evidence_status,
-                        retrieval_status=("MENTIONED_EXPLICIT" if citations else "NOT_FOUND_IN_RETRIEVED"),
-                        citations=citations,
+                        retrieval_status=retrieval_status,
+                        citations=(citations if evidence_status in {"present", "ambiguous"} else []),
                         missing_reason=(
-                            "Evidence was weak; treat as hypothesis and confirm."
+                            "Evidence was weak/indirect; treat as hypothesis and confirm."
+                            if evidence_status == "ambiguous"
+                            else "Evidence was weak; treat as hypothesis and confirm."
                             if needs_confirmation and not citations
                             else None
                         ),

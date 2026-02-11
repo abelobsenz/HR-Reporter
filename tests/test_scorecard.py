@@ -38,3 +38,17 @@ def test_build_functional_scorecard_normalizes_alias_areas() -> None:
     rows = build_functional_scorecard(findings=findings)
     labels = [row.functional_area for row in rows if row.rationale and "concern(s) were flagged" in row.rationale]
     assert labels.count("DEIB") == 1
+
+
+def test_build_functional_scorecard_does_not_default_to_strategic_when_coverage_is_low() -> None:
+    rows = build_functional_scorecard(
+        findings=[],
+        coverage_summary={
+            "retrieved_chunks": 4,
+            "fields_not_retrieved": 10,
+            "fields_not_found": 8,
+            "fields_with_explicit": 1,
+        },
+    )
+    assert rows
+    assert rows[0].maturity_level in {"Developing", "Aligned"}

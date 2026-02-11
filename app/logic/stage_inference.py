@@ -61,6 +61,13 @@ NON_HEADCOUNT_NUMBER_PATTERNS = [
     re.compile(r"\bnotice\b"),
 ]
 
+EXPECTED_STAGE_SIGNALS = [
+    "explicit_headcount",
+    "headcount_range",
+    "funding_round",
+    "primary_locations",
+]
+
 
 def _stage_for_headcount(headcount: int, stages: List[StageBand]) -> Optional[StageBand]:
     for stage in sorted(stages, key=lambda s: s.min_headcount):
@@ -481,6 +488,42 @@ def infer_stage(
             funding_stage_confidence = 0.34
             funding_drivers = ["Funding stage estimated from company-size band (no explicit funding-round signal)."]
 
+    if not explicit_headcount_evidence:
+        confidence = min(confidence, 0.68)
+    if not funding_stage_evidence and funding_stage_confidence is not None:
+        funding_stage_confidence = min(funding_stage_confidence, 0.45)
+
+    selected_index = next((idx for idx, stage in enumerate(stages_sorted) if stage.id == selected.id), None)
+    if selected_index is not None:
+        for offset in (-1, 1):
+            candidate_index = selected_index + offset
+            if candidate_index < 0 or candidate_index >= len(stages_sorted):
+                continue
+            candidate_stage = stages_sorted[candidate_index]
+            if any(existing.stage_id == candidate_stage.id for existing in candidates):
+                continue
+            candidate_confidence = round(max(0.1, confidence - 0.18), 3)
+            candidates.append(
+                _candidate(
+                    candidate_stage,
+                    candidate_confidence,
+                    ["Adjacent size-band candidate retained because confidence is not absolute."],
+                    signals,
+                )
+            )
+    candidates = sorted(candidates, key=lambda row: row.confidence, reverse=True)
+
+    signals_missing: List[str] = []
+    if not explicit_headcount_evidence:
+        signals_missing.append("explicit_headcount")
+    if not snapshot.headcount_range:
+        signals_missing.append("headcount_range")
+    if not funding_stage_evidence:
+        signals_missing.append("funding_round")
+    if not snapshot.primary_locations:
+        signals_missing.append("primary_locations")
+    signals_missing = [signal for signal in EXPECTED_STAGE_SIGNALS if signal in set(signals_missing)]
+
     drivers = drivers + funding_drivers
     company_stage_label = _company_stage_label(
         size_stage_label=selected.label,
@@ -504,6 +547,7 @@ def infer_stage(
         explicit_headcount_evidence=explicit_headcount_evidence,
         drivers=drivers,
         signals=signals,
+        signals_missing=signals_missing,
         candidates=candidates,
         note=note,
         source=source,

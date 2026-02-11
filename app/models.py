@@ -39,6 +39,7 @@ class EvidenceStatus(BaseModel):
 
     status: Literal[
         "present",
+        "ambiguous",
         "not_provided_in_sources",
         "explicitly_missing",
         "not_assessed",
@@ -171,6 +172,7 @@ class Finding(BaseModel):
     severity: Literal["low", "medium", "high", "critical"]
     evidence_status: Literal[
         "present",
+        "ambiguous",
         "not_provided_in_sources",
         "explicitly_missing",
         "not_assessed",
@@ -213,15 +215,12 @@ class Finding(BaseModel):
             if len(all_citations) < 1:
                 raise ValueError("present evidence_status requires at least one citation")
 
-        if self.evidence_status == "not_provided_in_sources":
-            # Allow citations for ambiguous/implicit mentions that still require confirmation.
-            if len(all_citations) != 0 and self.retrieval_status not in {
-                "MENTIONED_IMPLICIT",
-                "MENTIONED_AMBIGUOUS",
-            }:
-                raise ValueError(
-                    "not_provided_in_sources citations are only allowed for implicit/ambiguous retrieval matches"
-                )
+        if self.evidence_status == "ambiguous":
+            if len(all_citations) < 1:
+                raise ValueError("ambiguous evidence_status requires at least one citation")
+
+        if self.evidence_status in {"not_provided_in_sources", "not_assessed"} and len(all_citations) != 0:
+            raise ValueError("not_provided_in_sources/not_assessed cannot include citations")
 
         if self.evidence_status == "explicitly_missing":
             if len(all_citations) < 1:
@@ -241,6 +240,7 @@ class Subcheck(BaseModel):
     capability_key: str
     evidence_status: Literal[
         "present",
+        "ambiguous",
         "not_provided_in_sources",
         "explicitly_missing",
         "not_assessed",
@@ -271,11 +271,11 @@ class Subcheck(BaseModel):
         if self.evidence_status == "present" and len(self.citations) < 1:
             raise ValueError("present subcheck requires citations")
 
-        if self.evidence_status == "not_provided_in_sources" and len(self.citations) != 0:
-            if self.retrieval_status not in {"MENTIONED_IMPLICIT", "MENTIONED_AMBIGUOUS"}:
-                raise ValueError(
-                    "not_provided_in_sources subcheck citations are only allowed for implicit/ambiguous retrieval matches"
-                )
+        if self.evidence_status == "ambiguous" and len(self.citations) < 1:
+            raise ValueError("ambiguous subcheck requires citations")
+
+        if self.evidence_status in {"not_provided_in_sources", "not_assessed"} and len(self.citations) != 0:
+            raise ValueError("not_provided_in_sources/not_assessed subcheck cannot include citations")
 
         if self.evidence_status == "explicitly_missing":
             if len(self.citations) < 1:
@@ -348,6 +348,11 @@ class FinalReport(BaseModel):
     funding_stage: Optional[str] = None
     company_stage: Optional[str] = None
     drivers: List[str] = Field(default_factory=list)
+    stage_confidence: Optional[float] = Field(default=None, ge=0, le=1)
+    stage_provisional: bool = False
+    signals_used: List[str] = Field(default_factory=list)
+    signals_missing: List[str] = Field(default_factory=list)
+    alternate_stage_candidates: List[str] = Field(default_factory=list)
     functional_scorecard: List[FunctionalScorecardItem] = Field(default_factory=list)
     stage_based_recommendation: Optional[StageBasedRecommendation] = None
     profile_expectations: List[Finding] = Field(default_factory=list)
@@ -604,6 +609,7 @@ class StageInferenceResult(BaseModel):
     explicit_headcount_evidence: bool = False
     drivers: List[str] = Field(default_factory=list)
     signals: List[str] = Field(default_factory=list)
+    signals_missing: List[str] = Field(default_factory=list)
     candidates: List["StageCandidate"] = Field(default_factory=list)
     note: Optional[str] = None
     source: Literal["rules", "unknown"] = "rules"

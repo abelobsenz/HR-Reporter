@@ -29,16 +29,36 @@ def test_not_provided_cannot_have_citations() -> None:
         )
 
 
-def test_not_provided_allows_citations_for_ambiguous_retrieval() -> None:
+def test_not_provided_rejects_citations_even_for_ambiguous_retrieval() -> None:
+    with pytest.raises(ValueError):
+        Finding(
+            **_base_kwargs(),
+            evidence_status="not_provided_in_sources",
+            retrieval_status="MENTIONED_AMBIGUOUS",
+            evidence=[Citation(chunk_id="c1", snippet="Policy mentions overtime context but no explicit eligibility rule.")],
+            needs_confirmation=True,
+            questions=["Can you confirm the overtime policy?"],
+        )
+
+
+def test_ambiguous_requires_citations() -> None:
+    with pytest.raises(ValueError):
+        Finding(
+            **_base_kwargs(),
+            evidence_status="ambiguous",
+            retrieval_status="MENTIONED_AMBIGUOUS",
+            evidence=[],
+            needs_confirmation=True,
+        )
+
     finding = Finding(
         **_base_kwargs(),
-        evidence_status="not_provided_in_sources",
+        evidence_status="ambiguous",
         retrieval_status="MENTIONED_AMBIGUOUS",
         evidence=[Citation(chunk_id="c1", snippet="Policy mentions overtime context but no explicit eligibility rule.")],
         needs_confirmation=True,
-        questions=["Can you confirm the overtime policy?"],
     )
-    assert finding.evidence_status == "not_provided_in_sources"
+    assert finding.evidence_status == "ambiguous"
 
 
 def test_explicitly_missing_requires_absence_language() -> None:

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from app.models import FinalReport, Finding, MetricItem, RiskItem, Subcheck
+from app.models import Citation, FinalReport, Finding, MetricItem, RiskItem, Subcheck
 from app.report.renderer import render_markdown
 
 
@@ -64,3 +64,50 @@ def test_renderer_matches_golden_snapshot() -> None:
     assert "## Assumptions and Data Limitations" in rendered
     assert "## Disclaimer" in rendered
     assert "Owner: Owner:" not in rendered
+
+
+def test_renderer_displays_ambiguous_status_explicitly() -> None:
+    finding = Finding(
+        check_id="cp_leave_policy",
+        area="compliance_policies",
+        title="Leave and overtime policy coverage",
+        severity="high",
+        evidence_status="ambiguous",
+        retrieval_status="MENTIONED_AMBIGUOUS",
+        needs_confirmation=True,
+        stage_reason="Evidence is partial and requires confirmation.",
+        evidence=[
+            Citation(
+                chunk_id="doc-1-c002",
+                snippet="Benefits are described, but overtime eligibility rules are not explicitly specified in the policy text.",
+            )
+        ],
+        subchecks=[
+            Subcheck(
+                capability_key="leave_overtime_coverage",
+                evidence_status="ambiguous",
+                retrieval_status="MENTIONED_AMBIGUOUS",
+                citations=[
+                    Citation(
+                        chunk_id="doc-1-c002",
+                        snippet="Benefits are described, but overtime eligibility rules are not explicitly specified in the policy text.",
+                    )
+                ],
+            )
+        ],
+        actions=["Confirm overtime eligibility language and update policy text."],
+        owner="People Team",
+    )
+    report = FinalReport(
+        stage="Provisional: Seed | <20 employees",
+        drivers=["Evidence is partial/indirect for this control and needs confirmation: Leave and overtime policy coverage."],
+        profile_expectations=[finding],
+        signals_missing=["Explicit headcount statement"],
+        stage_confidence=0.54,
+        stage_provisional=True,
+    )
+
+    rendered = render_markdown(report, profile_name="Default Profile")
+
+    assert "Evidence status:** ambiguous" in rendered
+    assert "Stage confidence:** 0.54 (Provisional)" in rendered

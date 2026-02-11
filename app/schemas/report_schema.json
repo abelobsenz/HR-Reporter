@@ -127,6 +127,7 @@
         "evidence_status": {
           "enum": [
             "present",
+            "ambiguous",
             "not_provided_in_sources",
             "explicitly_missing",
             "not_assessed"
@@ -450,6 +451,7 @@
         "evidence_status": {
           "enum": [
             "present",
+            "ambiguous",
             "not_provided_in_sources",
             "explicitly_missing",
             "not_assessed"
@@ -551,6 +553,46 @@
         "type": "string"
       },
       "title": "Drivers",
+      "type": "array"
+    },
+    "stage_confidence": {
+      "anyOf": [
+        {
+          "maximum": 1,
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Stage Confidence"
+    },
+    "stage_provisional": {
+      "default": false,
+      "title": "Stage Provisional",
+      "type": "boolean"
+    },
+    "signals_used": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Signals Used",
+      "type": "array"
+    },
+    "signals_missing": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Signals Missing",
+      "type": "array"
+    },
+    "alternate_stage_candidates": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Alternate Stage Candidates",
       "type": "array"
     },
     "functional_scorecard": {

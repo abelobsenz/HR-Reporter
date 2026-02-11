@@ -150,6 +150,23 @@ def _build_coverage_note(reviewed_sources: List[str]) -> str:
     return "Sources were prioritized toward broad HR controls; niche/local pages were deprioritized unless directly relevant."
 
 
+def _stage_label_lookup(profile: ConsultantProfile) -> Dict[str, str]:
+    out = {stage.id: stage.label for stage in profile.stages}
+    for funding in profile.funding_stages:
+        out[funding.id] = funding.label
+    return out
+
+
+def _stage_signal_label(signal: str) -> str:
+    labels = {
+        "explicit_headcount": "Explicit headcount statement",
+        "headcount_range": "Headcount range statement",
+        "funding_round": "Explicit funding-round signal",
+        "primary_locations": "Primary location coverage",
+    }
+    return labels.get(signal, signal.replace("_", " "))
+
+
 def _build_methodology_summary(*, documents: List[object], coverage_summary: Dict[str, object]) -> List[str]:
     return [
         "Reviewed uploaded files, pasted notes, and supplied URLs.",
@@ -400,17 +417,6 @@ def run_assessment_pipeline(
     ranked_rubric = rank_findings(rubric_findings)
     ranked_discovery = rank_findings(discovery_findings)
     combined = rank_findings(ranked_rubric + ranked_discovery)
-    scorecard = build_functional_scorecard(findings=combined)
-    stage_guidance = build_stage_based_recommendation(
-        profile=profile,
-        size_stage_id=stage_result.stage_id,
-        size_stage_label=stage_result.stage_label,
-        funding_stage_id=stage_result.funding_stage_id,
-        funding_stage_label=stage_result.funding_stage_label,
-    )
-
-    follow_up_questions = _rank_follow_up_questions(combined, cap=8)
-    unknown_lines = _build_unknown_lines(unknown_paths, evidence_result.get("field_statuses", {}))
     coverage_summary = {
         **evidence_result.get("coverage_summary", {}),
         "urls_seeded": ingestion_stats.get("urls_seeded", 0),
@@ -423,13 +429,46 @@ def run_assessment_pipeline(
         "crawl_depth": ingestion_stats.get("crawl_depth", 1),
         "chunk_stats": chunk_stats,
     }
+    scorecard = build_functional_scorecard(findings=combined, coverage_summary=coverage_summary)
+    stage_guidance = build_stage_based_recommendation(
+        profile=profile,
+        size_stage_id=stage_result.stage_id,
+        size_stage_label=stage_result.stage_label,
+        funding_stage_id=stage_result.funding_stage_id,
+        funding_stage_label=stage_result.funding_stage_label,
+    )
+
+    follow_up_questions = _rank_follow_up_questions(combined, cap=8)
+    unknown_lines = _build_unknown_lines(unknown_paths, evidence_result.get("field_statuses", {}))
+    stage_confidence = stage_result.stage_confidence if stage_result.stage_confidence is not None else stage_result.confidence
+    provisional_threshold = float(os.getenv("HR_REPORT_STAGE_PROVISIONAL_THRESHOLD", "0.62"))
+    stage_provisional = bool(stage_confidence is not None and stage_confidence < provisional_threshold)
+    stage_lookup = _stage_label_lookup(profile)
+    alternate_stage_candidates: List[str] = []
+    for candidate in sorted(stage_result.candidates, key=lambda row: row.confidence, reverse=True):
+        if candidate.stage_id == stage_result.stage_id:
+            continue
+        label = stage_lookup.get(candidate.stage_id, candidate.stage_id)
+        alternate_stage_candidates.append(f"{label} ({candidate.confidence:.2f})")
+        if len(alternate_stage_candidates) >= 2:
+            break
+    stage_signals_used = list(dict.fromkeys(stage_result.drivers + [f"Proxy signal: {signal}" for signal in stage_result.signals]))
+    stage_signals_missing = [_stage_signal_label(signal) for signal in stage_result.signals_missing]
+    stage_display_label = stage_result.company_stage_label or stage_result.stage_label
+    if stage_provisional:
+        stage_display_label = f"Provisional: {stage_display_label}"
 
     report = FinalReport(
-        stage=stage_result.company_stage_label or stage_result.stage_label,
+        stage=stage_display_label,
         size_stage=stage_result.stage_label,
         funding_stage=stage_result.funding_stage_label,
-        company_stage=stage_result.company_stage_label,
+        company_stage=stage_display_label,
         drivers=build_growth_drivers(stage_result.drivers, combined),
+        stage_confidence=stage_confidence,
+        stage_provisional=stage_provisional,
+        signals_used=stage_signals_used,
+        signals_missing=stage_signals_missing,
+        alternate_stage_candidates=alternate_stage_candidates,
         functional_scorecard=scorecard,
         stage_based_recommendation=stage_guidance,
         profile_expectations=ranked_rubric,

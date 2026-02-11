@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, List, Tuple
 import logging
 
+from app.logic.evidence_semantics import EVIDENCE_STATUS_PRECEDENCE, map_verdict_to_evidence_status
 from app.llm.client import OpenAIResponsesClient
 from app.llm.prompts import (
     SNAPSHOT_ANALYST_SYSTEM_PROMPT,
@@ -104,6 +105,27 @@ POSITIVE_PATTERNS = [
     r"\bpolicy\b",
     r"\bdocumented\b",
 ]
+
+RELEVANCE_NOISE_PATTERNS = [
+    r"\b(junior|senior|lead|principal)\b.{0,50}\b(l[1-5]|m[1-5])\b",
+    r"\bcategory\b.{0,40}\bskill\b",
+    r"\bmastery\b.{0,120}\bscope\b",
+    r"\bownership\b.{0,60}\bmanager of one\b",
+    r"\|\s*category\s*\|",
+    r"\|\s*-----\s*\|",
+]
+
+CONTROL_FIELD_PREFIXES = (
+    "policies.",
+    "hiring.",
+    "onboarding.",
+    "manager_enablement.",
+    "performance.",
+    "comp_leveling.",
+    "hris_data.",
+    "er_retention.",
+    "benefits.",
+)
 
 HEADCOUNT_RANGE_OR_PLUS_RE = re.compile(r"\b\d{1,5}\s*(?:-|to)\s*\d{1,5}\b|\b\d{1,5}\s*\+")
 HEADCOUNT_INEXACT_RE = re.compile(
@@ -313,7 +335,12 @@ def extract_snapshot_from_evidence(
     for field_path in tracked_fields_list:
         rows = field_evidence.get(field_path, []) if isinstance(field_evidence, dict) else []
         sanitized_rows: List[Dict[str, Any]] = []
-        for row in rows[:12]:
+        sorted_rows = sorted(
+            (row for row in rows if isinstance(row, dict)),
+            key=lambda row: float(row.get("retrieval_score") or 0.0),
+            reverse=True,
+        )
+        for row in sorted_rows:
             if not isinstance(row, dict):
                 continue
             snippet = str(row.get("snippet", "")).strip()
@@ -332,7 +359,11 @@ def extract_snapshot_from_evidence(
                     "kind": row.get("kind"),
                 }
             )
-        evidence_payload[field_path] = sanitized_rows
+        evidence_payload[field_path] = _select_relevant_evidence_rows(
+            field_path=field_path,
+            rows=sanitized_rows,
+            limit=5,
+        )
 
     prompt_evidence_payload = _compact_evidence_payload_for_prompt(evidence_payload)
     schema = _snapshot_schema_for_openai()
@@ -646,51 +677,22 @@ def extract_snapshot_from_evidence(
         evidence.retrieval_queries = list(retrieval_queries.get(field_path, []))[:12]
         rows = evidence_payload.get(field_path, [])
         evidence.match_count = len(rows)
-
-        if status_guess == "MENTIONED_EXPLICIT" and evidence.status != "present" and rows:
-            top = rows[0]
-            citation = Citation(
-                chunk_id=str(top.get("chunk_id")),
-                snippet=str(top.get("snippet")),
-                source_id=(str(top.get("source_id")) if top.get("source_id") else None),
-                doc_id=(str(top.get("doc_id")) if top.get("doc_id") else None),
-                start_char=(int(top["start_char"]) if top.get("start_char") is not None else None),
-                end_char=(int(top["end_char"]) if top.get("end_char") is not None else None),
-                evidence_recovered_by="targeted_retrieval",
-                retrieval_score=(float(top["retrieval_score"]) if top.get("retrieval_score") is not None else None),
-            )
-            evidence.status = "present"
-            evidence.citations = [citation]
-            evidence.match_count = max(1, len(rows))
-
-        if status_guess in {"MENTIONED_IMPLICIT", "MENTIONED_AMBIGUOUS"} and evidence.status != "explicitly_missing":
-            if evidence.status != "present":
-                evidence.status = "not_provided_in_sources"
-            if rows:
-                top = rows[0]
-                evidence.citations = [
-                    Citation(
-                        chunk_id=str(top.get("chunk_id")),
-                        snippet=str(top.get("snippet")),
-                        source_id=(str(top.get("source_id")) if top.get("source_id") else None),
-                        doc_id=(str(top.get("doc_id")) if top.get("doc_id") else None),
-                        start_char=(int(top["start_char"]) if top.get("start_char") is not None else None),
-                        end_char=(int(top["end_char"]) if top.get("end_char") is not None else None),
-                        evidence_recovered_by="targeted_retrieval",
-                        retrieval_score=(
-                            float(top["retrieval_score"]) if top.get("retrieval_score") is not None else None
-                        ),
-                    )
-                ]
-
-        if status_guess == "NOT_RETRIEVED" and evidence.status not in {"present", "explicitly_missing"}:
-            evidence.status = "not_provided_in_sources"
+        if evidence.status in {"not_provided_in_sources", "not_assessed"}:
             evidence.citations = []
-
-        if status_guess == "NOT_FOUND_IN_RETRIEVED" and evidence.status not in {"present", "explicitly_missing"}:
-            evidence.status = "not_provided_in_sources"
-            if not evidence.citations:
-                evidence.citations = []
+        elif evidence.status == "ambiguous" and not evidence.citations and rows:
+            top = rows[0]
+            evidence.citations = [
+                Citation(
+                    chunk_id=str(top.get("chunk_id")),
+                    snippet=str(top.get("snippet")),
+                    source_id=(str(top.get("source_id")) if top.get("source_id") else None),
+                    doc_id=(str(top.get("doc_id")) if top.get("doc_id") else None),
+                    start_char=(int(top["start_char"]) if top.get("start_char") is not None else None),
+                    end_char=(int(top["end_char"]) if top.get("end_char") is not None else None),
+                    evidence_recovered_by="targeted_retrieval",
+                    retrieval_score=(float(top["retrieval_score"]) if top.get("retrieval_score") is not None else None),
+                )
+            ]
 
     snapshot = _apply_exact_headcount_from_chunks(
         snapshot=snapshot,
@@ -1184,12 +1186,19 @@ def _parse_value_text_for_field(field_path: str, value_text: str) -> Any:
     return None
 
 
-def _status_from_verdict(verdict: str) -> str:
-    if verdict == "present":
-        return "present"
-    if verdict == "explicitly_missing":
-        return "explicitly_missing"
-    return "not_provided_in_sources"
+def _status_from_verdict(
+    *,
+    verdict: str,
+    retrieval_status: str | None,
+    has_relevant_evidence: bool,
+    analysis_ran: bool = True,
+) -> str:
+    return map_verdict_to_evidence_status(
+        verdict=verdict,
+        retrieval_status=retrieval_status,
+        has_relevant_evidence=has_relevant_evidence,
+        analysis_ran=analysis_ran,
+    )
 
 
 def _overlay_analysis_on_snapshot_payload(
@@ -1207,10 +1216,10 @@ def _overlay_analysis_on_snapshot_payload(
         if not field_path:
             continue
         verdict = str(row.get("verdict", "not_found")).strip()
-        status = _status_from_verdict(verdict)
+        retrieval_status = str(row.get("retrieval_status") or "") or None
         citations = _dedupe_citations(row.get("citations", []))
 
-        if not citations:
+        if not citations and verdict in {"present", "explicitly_missing", "ambiguous", "conflict"}:
             rows = evidence_payload.get(field_path, [])
             citations = _dedupe_citations(
                 [
@@ -1222,15 +1231,21 @@ def _overlay_analysis_on_snapshot_payload(
                     if str(candidate.get("chunk_id", "")).strip() and str(candidate.get("snippet", "")).strip()
                 ]
             )
+        status = _status_from_verdict(
+            verdict=verdict,
+            retrieval_status=retrieval_status,
+            has_relevant_evidence=bool(citations),
+            analysis_ran=True,
+        )
 
         evidence = evidence_map.get(field_path, {})
         if not isinstance(evidence, dict):
             evidence = {}
         evidence["status"] = status
-        evidence["citations"] = citations if status in {"present", "explicitly_missing"} else []
+        evidence["citations"] = citations if status in {"present", "explicitly_missing", "ambiguous"} else []
         evidence["match_count"] = len(citations)
-        if row.get("retrieval_status"):
-            evidence["retrieval_status"] = row.get("retrieval_status")
+        if retrieval_status:
+            evidence["retrieval_status"] = retrieval_status
         if isinstance(row.get("retrieval_queries"), list):
             evidence["retrieval_queries"] = list(row.get("retrieval_queries", []))[:12]
         evidence_map[field_path] = evidence
@@ -1282,6 +1297,7 @@ def _snapshot_schema_for_openai() -> Dict[str, Any]:
                     "type": "string",
                     "enum": [
                         "present",
+                        "ambiguous",
                         "not_provided_in_sources",
                         "explicitly_missing",
                         "not_assessed",
@@ -1319,9 +1335,9 @@ def _coerce_evidence_map_entries_to_dict(payload: Dict[str, Any]) -> Dict[str, A
                 continue
             status = _normalize_evidence_status(entry.get("status"))
             citations = _filter_sentence_like_citations(entry.get("citations", []))
-            if status in {"present", "explicitly_missing"} and len(citations) == 0:
+            if status in {"present", "explicitly_missing", "ambiguous"} and len(citations) == 0:
                 status = "not_provided_in_sources"
-            if status == "not_provided_in_sources":
+            if status in {"not_provided_in_sources", "not_assessed"}:
                 citations = []
             evidence_map[field_path] = {
                 "status": status,
@@ -1338,6 +1354,7 @@ def _coerce_evidence_map_entries_to_dict(payload: Dict[str, Any]) -> Dict[str, A
 def _normalize_evidence_status(raw: Any) -> str:
     if raw in {
         "present",
+        "ambiguous",
         "not_provided_in_sources",
         "explicitly_missing",
         "not_assessed",
@@ -1352,6 +1369,61 @@ def _field_aliases(field_path: str) -> List[str]:
     if leaf and leaf not in aliases:
         aliases.append(leaf)
     return aliases
+
+
+def _is_control_like_field(field_path: str) -> bool:
+    return field_path.startswith(CONTROL_FIELD_PREFIXES)
+
+
+def _is_usable_evidence_snippet(snippet: str) -> bool:
+    text = " ".join(snippet.split()).strip()
+    if len(text) < 40:
+        return False
+    if not any(ch.isalpha() for ch in text):
+        return False
+    return True
+
+
+def _row_relevance_score(field_path: str, row: Dict[str, Any]) -> tuple[int, float]:
+    snippet = str(row.get("snippet", "")).strip()
+    lower = snippet.lower()
+    retrieval_score = float(row.get("retrieval_score") or 0.0)
+    aliases = [alias for alias in _field_aliases(field_path) if alias]
+    alias_hits = sum(1 for alias in aliases if alias in lower)
+    signal_hits = sum(1 for pattern in POSITIVE_PATTERNS + NEGATIVE_PATTERNS if re.search(pattern, lower))
+    noise_hits = sum(1 for pattern in RELEVANCE_NOISE_PATTERNS if re.search(pattern, lower))
+    score = (alias_hits * 4) + signal_hits - (noise_hits * 3)
+    return score, retrieval_score
+
+
+def _select_relevant_evidence_rows(
+    *,
+    field_path: str,
+    rows: List[Dict[str, Any]],
+    limit: int = 5,
+) -> List[Dict[str, Any]]:
+    if not rows:
+        return []
+
+    ranked: List[tuple[int, float, Dict[str, Any]]] = []
+    for row in rows:
+        snippet = str(row.get("snippet", "")).strip()
+        chunk_id = str(row.get("chunk_id", "")).strip()
+        if not chunk_id or not _is_usable_evidence_snippet(snippet):
+            continue
+        relevance, retrieval_score = _row_relevance_score(field_path, row)
+        ranked.append((relevance, retrieval_score, row))
+
+    ranked.sort(key=lambda item: (item[0], item[1]), reverse=True)
+    if not ranked:
+        return []
+
+    if _is_control_like_field(field_path):
+        matched = [row for relevance, _, row in ranked if relevance > 0]
+        if matched:
+            return matched[:limit]
+
+    return [row for _, _, row in ranked[:limit]]
 
 
 def _split_sentences(text: str) -> List[str]:
@@ -1830,21 +1902,42 @@ def _merge_snapshot_payloads(
     tracked_fields: List[str],
 ) -> Dict[str, Any]:
     merged = CompanyPeopleSnapshot().model_dump(mode="python")
-    sources_by_field: Dict[str, Tuple[int, int, Dict[str, Any]]] = {}
+    status_by_field: Dict[str, tuple[int, int, str]] = {}
+    citations_by_field: Dict[str, List[Dict[str, Any]]] = {}
+    value_by_field: Dict[str, tuple[int, int, int, int, Any]] = {}
 
     for idx, payload in enumerate(payloads):
         payload = _coerce_evidence_map_entries_to_dict(dict(payload))
         evidence_map = payload.get("evidence_map", {}) or {}
-        for field_path, raw_status in evidence_map.items():
+        if not isinstance(evidence_map, dict):
+            evidence_map = {}
+
+        for field_path in tracked_fields:
+            raw_status = evidence_map.get(field_path)
             if not isinstance(raw_status, dict):
                 continue
             status = _normalize_evidence_status(raw_status.get("status"))
-            citations = raw_status.get("citations", [])
+            citations = _dedupe_citations(raw_status.get("citations", []))
             rank = _evidence_rank(status)
-            current = sources_by_field.get(field_path)
-            candidate = (rank, len(citations), {"status": status, "citations": citations, "idx": idx})
-            if current is None or (candidate[0], candidate[1]) > (current[0], current[1]):
-                sources_by_field[field_path] = candidate
+            current_status = status_by_field.get(field_path)
+            candidate_status = (rank, len(citations), status)
+            if current_status is None or (candidate_status[0], candidate_status[1]) > (
+                current_status[0],
+                current_status[1],
+            ):
+                status_by_field[field_path] = candidate_status
+
+            if citations:
+                combined = _dedupe_citations(citations_by_field.get(field_path, []) + citations)
+                citations_by_field[field_path] = combined[:2]
+
+            value = _get_path(payload, field_path)
+            if _is_nonempty_value(value):
+                quality = _value_quality(value)
+                candidate_value = (rank, quality, len(citations), -idx, value)
+                current_value = value_by_field.get(field_path)
+                if current_value is None or candidate_value[:4] > current_value[:4]:
+                    value_by_field[field_path] = candidate_value
 
     # Merge top-level list fields across batches.
     for list_field in ["primary_locations", "current_priorities", "key_risks"]:
@@ -1858,7 +1951,7 @@ def _merge_snapshot_payloads(
     # Apply best evidence/value per tracked field.
     merged_evidence_map: Dict[str, Dict[str, Any]] = {}
     for field_path in tracked_fields:
-        source = sources_by_field.get(field_path)
+        source = status_by_field.get(field_path)
         if source is None:
             merged_evidence_map[field_path] = {
                 "status": "not_provided_in_sources",
@@ -1866,14 +1959,17 @@ def _merge_snapshot_payloads(
             }
             continue
 
-        _, _, info = source
-        status = str(info["status"])
-        citations = _dedupe_citations(info.get("citations", []))
+        _, _, status = source
+        citations = citations_by_field.get(field_path, [])
+        if status in {"not_provided_in_sources", "not_assessed"}:
+            citations = []
+        elif status == "ambiguous" and not citations:
+            status = "not_provided_in_sources"
         merged_evidence_map[field_path] = {"status": status, "citations": citations}
 
-        value = _get_path(payloads[int(info["idx"])], field_path)
-        if value is not None and value != []:
-            _set_path(merged, field_path, value)
+        best_value = value_by_field.get(field_path)
+        if best_value is not None:
+            _set_path(merged, field_path, best_value[4])
 
     # Backfill a few useful scalar fields if they were not included in tracked_fields.
     for scalar in ["company_name", "headcount", "headcount_range"]:
@@ -1890,13 +1986,31 @@ def _merge_snapshot_payloads(
 
 
 def _evidence_rank(status: str) -> int:
-    order = {
-        "not_provided_in_sources": 1,
-        "not_assessed": 2,
-        "present": 3,
-        "explicitly_missing": 4,
-    }
-    return order.get(status, 0)
+    return EVIDENCE_STATUS_PRECEDENCE.get(status, 0)
+
+
+def _is_nonempty_value(value: Any) -> bool:
+    if value is None:
+        return False
+    if isinstance(value, str):
+        return bool(value.strip())
+    if isinstance(value, (list, tuple, dict, set)):
+        return len(value) > 0
+    return True
+
+
+def _value_quality(value: Any) -> int:
+    if isinstance(value, bool):
+        return 5
+    if isinstance(value, (int, float)):
+        return 4
+    if isinstance(value, str):
+        return 3
+    if isinstance(value, (list, tuple)):
+        return 2
+    if isinstance(value, dict):
+        return 1
+    return 0
 
 
 def _dedupe_citations(citations: Any) -> List[Dict[str, Any]]:
