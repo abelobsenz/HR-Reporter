@@ -43,16 +43,14 @@ def _apply_local_defaults(args: argparse.Namespace) -> None:
         )
         if not args.snapshot_file:
             args.snapshot_file = local_snapshot
-        args.no_llm_plan = True
 
 
 def build_parser() -> argparse.ArgumentParser:
-    pack_default = os.getenv("HR_REPORT_PACK", "tuning/packs/default_pack.yaml")
+    profile_default = os.getenv("HR_REPORT_PROFILE", "tuning/profile.yaml")
     input_default = os.getenv("HR_REPORT_INPUT")
     output_default = os.getenv("HR_REPORT_OUTPUT_DIR", "out")
     model_default = os.getenv("OPENAI_MODEL", "gpt-4.1-mini")
     timeout_default = _env_int("OPENAI_TIMEOUT_SECONDS", 90)
-    no_llm_plan_default = _env_bool("HR_REPORT_NO_LLM_PLAN", default=False)
     local_test_default = _env_bool("HR_REPORT_LOCAL_TEST", default=False)
     offline_test_default = _env_bool("HR_REPORT_OFFLINE_TEST", default=False)
     host_default = os.getenv("HR_REPORT_HOST", "127.0.0.1")
@@ -62,7 +60,11 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     run_parser = subparsers.add_parser("run", help="Run an assessment from CLI")
-    run_parser.add_argument("--pack", default=pack_default, help="Path to consultant pack YAML/JSON")
+    run_parser.add_argument(
+        "--profile",
+        default=profile_default,
+        help="Path to consultant profile YAML/JSON",
+    )
     run_parser.add_argument("--input", default=input_default, help="File or directory with TXT/PDF/DOCX")
     run_parser.add_argument("--text", help="Pasted text input")
     run_parser.add_argument("--url", action="append", default=[], help="Optional URL(s) to ingest")
@@ -74,12 +76,6 @@ def build_parser() -> argparse.ArgumentParser:
         help="OpenAI request timeout in seconds",
     )
     run_parser.add_argument("--snapshot-file", help="Optional precomputed snapshot JSON")
-    run_parser.add_argument(
-        "--no-llm-plan",
-        action="store_true",
-        default=no_llm_plan_default,
-        help="Use deterministic 30/60/90 plan generation",
-    )
     run_parser.add_argument(
         "--local-test",
         action="store_true",
@@ -105,15 +101,15 @@ def build_parser() -> argparse.ArgumentParser:
 def run_command(args: argparse.Namespace) -> int:
     _apply_local_defaults(args)
     logger.info(
-        "cli_run_start pack=%s input=%s text=%s urls=%s out=%s",
-        args.pack,
+        "cli_run_start profile=%s input=%s text=%s urls=%s out=%s",
+        args.profile,
         args.input,
         bool(args.text),
         len(args.url or []),
         args.out,
     )
     result = run_assessment_pipeline(
-        pack_path=args.pack,
+        profile_path=args.profile,
         input_path=args.input,
         text=args.text,
         urls=args.url,
@@ -121,7 +117,6 @@ def run_command(args: argparse.Namespace) -> int:
         timeout_seconds=args.timeout_seconds,
         output_root=args.out,
         snapshot_file=args.snapshot_file,
-        no_llm_plan=args.no_llm_plan,
     )
     print(json.dumps({"output_dir": result["output_dir"], "files": result["files"]}, indent=2))
     logger.info("cli_run_done output_dir=%s", result["output_dir"])

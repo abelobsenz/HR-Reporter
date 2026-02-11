@@ -1,204 +1,202 @@
-# HR Growth Areas Assessment
+# HR Assessment Report
 
-Based on the indicated sources we reviewed, this assessment prioritizes likely growth areas and confirmation needs.
+## Executive Summary
+| Profile | Company Stage | Size Band | Funding Stage |
+|---|---|---|---|
+| {{ profile_name }} | {{ (report.company_stage or report.stage)|replace('|', '/') }} | {{ (report.size_stage or report.stage)|replace('|', '/') }} | {{ (report.funding_stage or 'Not explicitly stated')|replace('|', '/') }} |
 
-## Stage and Scale
-- Stage: **{{ report.stage }}**
-- Confidence: **{{ '%.0f'|format(report.confidence * 100) }}%**
 {% if report.stage_note %}
-- Stage note: {{ report.stage_note }}
+**Stage note:** {{ report.stage_note }}
 {% endif %}
 
-### Drivers
+{% if report.drivers %}
+### Why This Stage
 {% for driver in report.drivers %}
 - {{ driver }}
 {% endfor %}
+{% endif %}
 
-## Coverage Note
+## About This Assessment
+This internal draft evaluates HR maturity and business impact across core functional areas.
+
+Maturity scale:
+- `Under-Developed` = reactive or inconsistent controls
+- `Developing` = foundational controls exist but are uneven
+- `Aligned` = repeatable and documented controls
+- `Strategic` = integrated, scalable, and metrics-driven controls
+
+Impact scale:
+- `Significant` = materially affects growth, risk, retention, or execution
+- `Moderate` = meaningful operational effect, but not existential
+- `Limited` = useful improvements, lower urgency at current stage
+
+## Methodology and Data Sources
+{% if report.methodology_summary %}
+{% for line in report.methodology_summary %}
+- {{ line }}
+{% endfor %}
+{% endif %}
+
+### Source Coverage
+| Metric | Value |
+|---|---|
+| URLs seeded/fetched | {{ report.coverage_summary.urls_seeded or 0 }} / {{ report.coverage_summary.urls_fetched or 0 }} |
+| URL fetch failures | {{ report.coverage_summary.url_fetch_failures or 0 }} |
+| Retrieved docs/chunks | {{ report.coverage_summary.retrieved_docs or 0 }} / {{ report.coverage_summary.retrieved_chunks or 0 }} |
+| Domains | {{ report.coverage_summary.domains|join(', ') if report.coverage_summary.domains else 'None' }} |
+
 {% if report.coverage_note %}
-{{ report.coverage_note }}
-{% else %}
-Sources reviewed were primarily onboarding/time-off pages; other domains may not be covered.
+**Coverage note:** {{ report.coverage_note }}
 {% endif %}
 
-## Coverage Summary
-{% if report.coverage_summary %}
-- URLs seeded: {{ report.coverage_summary.urls_seeded or 0 }}
-- URLs fetched: {{ report.coverage_summary.urls_fetched or 0 }}
-- URL fetch failures: {{ report.coverage_summary.url_fetch_failures or 0 }}
-- Redirects: {{ report.coverage_summary.url_redirects or 0 }}
-- Domains: {{ report.coverage_summary.domains|join(', ') if report.coverage_summary.domains else 'None' }}
-- Directory crawl ran: {{ report.coverage_summary.directory_crawl_ran }}
-- Crawl depth: {{ report.coverage_summary.crawl_depth or 1 }}
-- Retrieved docs/chunks: {{ report.coverage_summary.retrieved_docs or 0 }}/{{ report.coverage_summary.retrieved_chunks or 0 }}
-{% endif %}
-
-## Prioritized Growth Areas
-{% if report.top_growth_areas %}
-{% for finding in report.top_growth_areas %}
-### {{ loop.index }}. {{ finding.title }}
-- Area: {{ finding.area }}
-- Severity: {{ finding.severity }}
-- Evidence status: {{ finding.evidence_status }}
-{% if finding.retrieval_status %}
-- Retrieval status: {{ finding.retrieval_status }}
-{% endif %}
-- Needs confirmation: {{ finding.needs_confirmation }}
-- Threshold prompt: {{ finding.is_threshold_prompt }}
-- Owner: {{ finding.owner }}
-- Why now: {{ finding.stage_reason }}
-
-Subchecks:
-{% if finding.subchecks %}
-{% for sub in finding.subchecks %}
-- {{ sub.capability_key }} ({{ sub.evidence_status }}){% if sub.missing_reason %}: {{ sub.missing_reason }}{% endif %}
+### Reviewed Sources
+{% if report.reviewed_sources %}
+{% for source in report.reviewed_sources %}
+{{ loop.index }}. {{ source }}
 {% endfor %}
 {% else %}
-- None
+No reviewed sources recorded.
 {% endif %}
 
-Actions:
+## HR Functional Scorecard
+{% if report.functional_scorecard %}
+| Functional Area | Maturity | Impact | Rationale |
+|---|---|---|---|
+{% for row in report.functional_scorecard %}
+| {{ row.functional_area }} | {{ row.maturity_level }} | {{ row.impact_level }} | {{ row.rationale or '' }} |
+{% endfor %}
+{% else %}
+No scorecard rows available.
+{% endif %}
+
+## Top Risks and Risk Flags
+{% if report.risks %}
+| Category | Severity | Statement |
+|---|---|---|
+{% for risk in report.risks %}
+| {{ risk.category }} | {{ risk.severity }} | {{ risk.statement }} |
+{% endfor %}
+{% else %}
+No explicit high-risk findings were confirmed in reviewed evidence.
+{% endif %}
+
+## Stage-Based Recommendations
+{% if report.stage_based_recommendation %}
+**Stage context:** {{ report.stage_based_recommendation.funding_stage or 'Not explicitly stated' }} | {{ report.stage_based_recommendation.size_stage }}
+
+**Recommended HR structure:** {{ report.stage_based_recommendation.hr_structure_recommendation }}
+
+{% if report.stage_based_recommendation.recommended_practices %}
+### Recommended Employment Practices
+{% for item in report.stage_based_recommendation.recommended_practices %}
+- {{ item }}
+{% endfor %}
+{% endif %}
+
+{% if report.stage_based_recommendation.potential_risks %}
+### Potential Stage Risks
+{% for item in report.stage_based_recommendation.potential_risks %}
+- {{ item }}
+{% endfor %}
+{% endif %}
+
+{% if report.stage_based_recommendation.sources %}
+### Guidance Sources
+{% for source in report.stage_based_recommendation.sources %}
+- {{ source.title }}{% if source.published_date %} ({{ source.published_date }}){% endif %}: {{ source.url }}
+{% endfor %}
+{% endif %}
+{% else %}
+No stage-based recommendation was generated.
+{% endif %}
+
+## Functional Area Deep-Dives
+### Rubric Findings
+{% if report.profile_expectations %}
+{% for finding in report.profile_expectations %}
+#### R{{ loop.index }}. {{ finding.title }}
+**Area:** {{ finding.area }} | **Severity:** {{ finding.severity }} | **Evidence status:** {{ finding.evidence_status }}{% if finding.retrieval_status %} | **Retrieval status:** {{ finding.retrieval_status }}{% endif %}
+
+**Current state / implication:** {{ finding.stage_reason }}
+
 {% if finding.actions %}
+**Recommendations**
 {% for action in finding.actions %}
-- {{ action }}
+{{ loop.index }}. {{ action }}
 {% endfor %}
-{% else %}
-- None
-{% endif %}
-
-Metrics:
-{% if finding.metrics %}
-{% for metric in finding.metrics %}
-{% if metric.status == 'found' %}
-- {{ metric.metric }}: {{ metric.value }}
-{% else %}
-- {{ metric.metric }}: unknown
-{% endif %}
-{% endfor %}
-{% else %}
-- None
 {% endif %}
 
 {% if finding.evidence %}
-Evidence:
+**Evidence**
 {% for citation in finding.evidence %}
-{% if citation.chunk_id != 'not_found' %}
-- [{{ citation.chunk_id }}] "{{ citation.snippet }}"
-{% endif %}
+- `{{ citation.chunk_id }}` {{ citation.snippet }}
 {% endfor %}
 {% else %}
-Evidence: {% if finding.retrieval_status == 'NOT_RETRIEVED' %}Coverage gap: expected domain/pages were not retrieved.{% elif finding.retrieval_status == 'NOT_FOUND_IN_RETRIEVED' %}Searched retrieved corpus; no explicit match observed.{% else %}Not provided in sources.{% endif %}
+**Evidence:** Not explicitly confirmed in reviewed sources.
 {% endif %}
 
 {% if finding.questions %}
-Follow-up:
+**Follow-up questions**
 {% for q in finding.questions %}
-- {{ q }}
+{{ loop.index }}. {{ q }}
 {% endfor %}
 {% endif %}
 
 {% endfor %}
 {% else %}
-No qualifying growth areas after evidence and confirmation-path checks.
+No rubric concerns were flagged.
 {% endif %}
 
-## Risk Register
-{% if report.risks %}
-{% for risk in report.risks %}
-- **{{ risk.category }} / {{ risk.severity }}**: {{ risk.statement }}
-{% if risk.evidence %}
-  Evidence:
-{% for citation in risk.evidence %}
-{% if citation.chunk_id != 'not_found' %}
-  - [{{ citation.chunk_id }}] "{{ citation.snippet }}"
-{% endif %}
+### Additional Observations
+{% if report.additional_observations %}
+{% for finding in report.additional_observations %}
+#### D{{ loop.index }}. {{ finding.title }}
+**Area:** {{ finding.area }} | **Severity:** {{ finding.severity }} | **Evidence status:** {{ finding.evidence_status }}
+
+**Observation:** {{ finding.stage_reason }}
+
+{% if finding.evidence %}
+**Evidence**
+{% for citation in finding.evidence %}
+- `{{ citation.chunk_id }}` {{ citation.snippet }}
 {% endfor %}
 {% else %}
-  Evidence: Searched retrieved corpus; no explicit match observed.
+**Evidence:** Hypothesis-level signal only.
 {% endif %}
-  Mitigation:
-{% for m in risk.mitigation %}
-  - {{ m }}
+
+{% if finding.questions %}
+**Follow-up questions**
+{% for q in finding.questions %}
+{{ loop.index }}. {{ q }}
 {% endfor %}
-  Note: {{ risk.legal_note }}
+{% endif %}
+
 {% endfor %}
 {% else %}
-- No high-risk compliance/ER issues were identified in reviewed sources.
+No additional observations beyond rubric findings.
 {% endif %}
 
-## 30/60/90-Day Action Plan
-- Why now: {{ report.plan_30_60_90.why_now }}
-
-### Days 1-30
-{% for item in report.plan_30_60_90.days_30 %}
-- {{ item.action }}
-  - Rationale: {{ item.rationale }}
-{% if item.evidence %}
-{% for citation in item.evidence %}
-{% if citation.chunk_id != 'not_found' %}
-  - Evidence: [{{ citation.chunk_id }}] "{{ citation.snippet }}"
-{% endif %}
+## Assumptions and Data Limitations
+{% if report.data_limitations %}
+{% for item in report.data_limitations %}
+- {{ item }}
 {% endfor %}
-{% else %}
-  - Evidence: Searched retrieved corpus; no explicit match observed.
-{% endif %}
-{% endfor %}
-
-### Days 31-60
-{% for item in report.plan_30_60_90.days_60 %}
-- {{ item.action }}
-  - Rationale: {{ item.rationale }}
-{% if item.evidence %}
-{% for citation in item.evidence %}
-{% if citation.chunk_id != 'not_found' %}
-  - Evidence: [{{ citation.chunk_id }}] "{{ citation.snippet }}"
-{% endif %}
-{% endfor %}
-{% else %}
-  - Evidence: Searched retrieved corpus; no explicit match observed.
-{% endif %}
-{% endfor %}
-
-### Days 61-90
-{% for item in report.plan_30_60_90.days_90 %}
-- {{ item.action }}
-  - Rationale: {{ item.rationale }}
-{% if item.evidence %}
-{% for citation in item.evidence %}
-{% if citation.chunk_id != 'not_found' %}
-  - Evidence: [{{ citation.chunk_id }}] "{{ citation.snippet }}"
-{% endif %}
-{% endfor %}
-{% else %}
-  - Evidence: Searched retrieved corpus; no explicit match observed.
-{% endif %}
-{% endfor %}
-
-## Follow-Up Questions (Top)
-{% if report.follow_up_questions %}
-{% for q in report.follow_up_questions %}
-- {{ q }}
-{% endfor %}
-{% else %}
-- None
 {% endif %}
 
-## Unknowns
 {% if report.unknowns %}
+### Unknowns
 {% for u in report.unknowns %}
 - {{ u }}
 {% endfor %}
-{% else %}
-- None
 {% endif %}
 
-## Appendix: Reviewed Sources
-{% if report.reviewed_sources %}
-{% for source in report.reviewed_sources %}
-- {{ source }}
+## Follow-Up Questions
+{% if report.follow_up_questions %}
+{% for q in report.follow_up_questions %}
+{{ loop.index }}. {{ q }}
 {% endfor %}
 {% else %}
-- None
+None.
 {% endif %}
 
 ## Disclaimer

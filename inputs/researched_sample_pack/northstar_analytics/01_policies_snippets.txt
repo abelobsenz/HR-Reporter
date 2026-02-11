@@ -1,7 +1,0 @@
-Policies / employee experience snippets (fictional)
-
-- There is no single employee handbook. Policies are scattered in Notion pages.
-- Time off: "Unlimited" but no documented guidance. People ask Finance for approvals.
-- Complaint reporting: employees are told to "talk to their manager or the founders."
-- No documented process for investigations or discipline.
-- US work authorization: founder says "we collect docs" but no written I-9 checklist.

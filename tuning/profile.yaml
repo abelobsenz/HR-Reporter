@@ -1,0 +1,790 @@
+version: "2.0"
+name: "Default Startup HR Scale Profile"
+assessment_focus: >
+  Generate an evidence-grounded HR Assessment Report for startup companies that
+  identifies optimal HR structure, recommended employment practices, and stage-specific
+  risks by company size and funding stage.
+report_focus_points:
+  - "Align output to the HR Assessment Report template structure."
+  - "Use complete sentence-level citations and avoid partial snippets."
+  - "Evaluate by size bands: <20, 20-49, 50-99, 100-250, and 250+ employees."
+  - "Evaluate by funding stages: Seed, Series A, Series B, and Series C+."
+  - "Provide practical, stage-fit recommendations and avoid over-building too early."
+  - "Avoid arbitrary numeric scoring and do not produce a 30/60/90-day action plan section."
+
+stages:
+  - id: "lt20"
+    label: "<20 employees"
+    min_headcount: 0
+    max_headcount: 19
+    expectations:
+      - hr_strategy_documented
+      - handbook_current
+      - anti_harassment_policy
+      - leave_overtime_coverage
+      - offer_letter_templates
+      - worker_classification_controls
+      - structured_interviewing
+      - onboarding_basics
+      - manager_training
+      - hris_system
+      - mandatory_training_tracking
+      - checklist_reconciliation
+
+  - id: "20-49"
+    label: "20-49 employees"
+    min_headcount: 20
+    max_headcount: 49
+    expectations:
+      - hr_strategy_documented
+      - executive_hr_partnership
+      - handbook_current
+      - anti_harassment_policy
+      - leave_overtime_coverage
+      - offer_letter_templates
+      - worker_classification_controls
+      - i9_recordkeeping_controls
+      - retaliation_reporting_channels
+      - structured_interviewing
+      - job_descriptions_ada_compliant
+      - candidate_funnel_metrics
+      - pay_transparency_compliance
+      - onboarding_basics
+      - onboarding_buddy_feedback
+      - manager_training
+      - one_on_one_cadence
+      - performance_cycle
+      - goal_framework
+      - hris_system
+      - mandatory_training_tracking
+      - er_case_process
+      - offboarding_controls
+      - checklist_reconciliation
+
+  - id: "50-99"
+    label: "50-99 employees"
+    min_headcount: 50
+    max_headcount: 99
+    expectations:
+      - hr_strategy_documented
+      - executive_hr_partnership
+      - workforce_planning_scenarios
+      - handbook_current
+      - anti_harassment_policy
+      - leave_overtime_coverage
+      - offer_letter_templates
+      - worker_classification_controls
+      - i9_recordkeeping_controls
+      - retaliation_reporting_channels
+      - structured_interviewing
+      - job_descriptions_ada_compliant
+      - candidate_funnel_metrics
+      - pay_transparency_compliance
+      - onboarding_basics
+      - onboarding_buddy_feedback
+      - manager_training
+      - one_on_one_cadence
+      - performance_cycle
+      - goal_framework
+      - leadership_development_programs
+      - leveling_framework
+      - pay_bands
+      - compensation_review_cycle
+      - hris_system
+      - data_audit_cadence
+      - mandatory_training_tracking
+      - er_case_process
+      - engagement_signals
+      - benefits_governance
+      - deib_strategy_and_metrics
+      - offboarding_controls
+      - change_management_communication
+      - data_privacy_controls
+      - checklist_reconciliation
+
+  - id: "100-250"
+    label: "100-250 employees"
+    min_headcount: 100
+    max_headcount: 250
+    expectations:
+      - hr_strategy_documented
+      - executive_hr_partnership
+      - workforce_planning_scenarios
+      - handbook_current
+      - anti_harassment_policy
+      - leave_overtime_coverage
+      - offer_letter_templates
+      - worker_classification_controls
+      - i9_recordkeeping_controls
+      - retaliation_reporting_channels
+      - structured_interviewing
+      - job_descriptions_ada_compliant
+      - candidate_funnel_metrics
+      - pay_transparency_compliance
+      - onboarding_basics
+      - onboarding_buddy_feedback
+      - manager_training
+      - one_on_one_cadence
+      - performance_cycle
+      - goal_framework
+      - leadership_development_programs
+      - succession_planning
+      - training_roi_tracking
+      - leveling_framework
+      - pay_bands
+      - compensation_review_cycle
+      - compensation_philosophy
+      - hris_system
+      - data_audit_cadence
+      - analytics_for_leaders
+      - self_service_portal
+      - mandatory_training_tracking
+      - er_case_process
+      - engagement_signals
+      - benefits_governance
+      - mental_health_and_wellness_support
+      - deib_strategy_and_metrics
+      - offboarding_controls
+      - change_management_communication
+      - data_privacy_controls
+      - checklist_reconciliation
+
+  - id: "250+"
+    label: "250+ employees"
+    min_headcount: 251
+    max_headcount:
+    expectations:
+      - hr_strategy_documented
+      - executive_hr_partnership
+      - workforce_planning_scenarios
+      - handbook_current
+      - anti_harassment_policy
+      - leave_overtime_coverage
+      - offer_letter_templates
+      - worker_classification_controls
+      - i9_recordkeeping_controls
+      - retaliation_reporting_channels
+      - structured_interviewing
+      - job_descriptions_ada_compliant
+      - candidate_funnel_metrics
+      - pay_transparency_compliance
+      - onboarding_basics
+      - onboarding_buddy_feedback
+      - manager_training
+      - one_on_one_cadence
+      - performance_cycle
+      - goal_framework
+      - leadership_development_programs
+      - succession_planning
+      - training_roi_tracking
+      - leveling_framework
+      - pay_bands
+      - compensation_review_cycle
+      - compensation_philosophy
+      - hris_system
+      - data_audit_cadence
+      - analytics_for_leaders
+      - self_service_portal
+      - mandatory_training_tracking
+      - er_case_process
+      - engagement_signals
+      - benefits_governance
+      - mental_health_and_wellness_support
+      - deib_strategy_and_metrics
+      - offboarding_controls
+      - change_management_communication
+      - data_privacy_controls
+      - checklist_reconciliation
+
+funding_stages:
+  - id: "seed"
+    label: "Seed"
+    aliases: ["pre-seed", "seed stage", "seed-funded"]
+
+  - id: "series_a"
+    label: "Series A"
+    aliases: ["post-seed", "series-a", "series a"]
+
+  - id: "series_b"
+    label: "Series B"
+    aliases: ["series-b", "series b"]
+
+  - id: "series_c_plus"
+    label: "Series C+"
+    aliases: ["growth stage", "series c", "series d", "series e", "pre-ipo", "ipo"]
+
+startup_guidance_sources:
+  - id: aihr_startups
+    title: "AIHR - HR for Startups"
+    url: "https://www.aihr.com/blog/hr-for-startups/"
+    notes: "Guidance on building the HR function by startup growth stage."
+
+  - id: hibob_startup_challenges
+    title: "HiBob - The top 9 HR challenges in startups and how to tackle them"
+    url: "https://www.hibob.com/blog/hr-challenges-in-startups/"
+    notes: "Operating challenges and practical mitigation patterns for scaling startups."
+
+  - id: hr_copilot_spec_v1
+    title: "HR Copilot Specifications - v1"
+    url: "/Users/abelobsenz/Downloads/HR Copilot Specifications - v1.docx"
+    published_date: "2026-02-10"
+    notes: "Defines required deliverables, stage-based outputs, and evidence-traceable reporting requirements."
+
+  - id: hr_assessment_report_template
+    title: "HR Assessment Report - Template"
+    url: "/Users/abelobsenz/Downloads/HR Assessment Report - Template.docx"
+    notes: "Target report structure, scoring language, and narrative style."
+
+  - id: hr_functional_checklist_template
+    title: "HR Assessment Checklist - Template - HR Functional Areas"
+    url: "/Users/abelobsenz/Downloads/HR Assessment Checklist - Template   - HR Functional Areas.csv"
+    notes: "Detailed control coverage across HR functional areas."
+
+startup_guidance_rules:
+  - id: size_lt20_seed_baseline
+    size_stage_ids: ["lt20"]
+    funding_stage_ids: ["seed"]
+    hr_structure_recommendation: "Founder-led People operations with fractional HR support; establish minimum viable, compliant people infrastructure before scaling headcount."
+    recommended_practices:
+      - "Set baseline legal controls early: handbook, anti-harassment, leave/overtime, complaint and retaliation reporting path."
+      - "Define repeatable hiring and onboarding basics before hiring velocity increases."
+      - "Add a lightweight HRIS to avoid data fragmentation and manual process risk."
+      - "Codify mission, values, and expected behaviors so culture scales intentionally."
+    potential_risks:
+      - "Reactive HR execution causes inconsistent decisions and avoidable compliance exposure."
+      - "No structured onboarding increases ramp-time and early attrition risk."
+      - "Founder bottlenecks delay people decisions as team size grows."
+    source_ids: ["aihr_startups", "hibob_startup_challenges", "hr_copilot_spec_v1"]
+
+  - id: size_20_49_series_a_repeatability
+    size_stage_ids: ["20-49"]
+    funding_stage_ids: ["series_a"]
+    hr_structure_recommendation: "Dedicated People Ops generalist/manager with selective specialist support; prioritize repeatable manager and compliance processes."
+    recommended_practices:
+      - "Formalize manager 1:1 cadence, performance cycle, and goal-setting rhythm."
+      - "Operationalize compliance by jurisdiction (pay transparency, wage/hour, training, classification)."
+      - "Track hiring funnel metrics and time-to-fill/quality signals to improve recruiting outcomes."
+      - "Reconcile checklist self-reports against policy artifacts before final recommendations."
+    potential_risks:
+      - "Rapid hiring without process discipline creates manager-capacity and quality-of-hire issues."
+      - "Policy lag across states introduces legal and employee-relations risk."
+      - "Unvalidated self-reported controls produce false confidence in risk posture."
+    source_ids: ["aihr_startups", "hibob_startup_challenges", "hr_functional_checklist_template"]
+
+  - id: size_50_99_series_b_scaling
+    size_stage_ids: ["50-99"]
+    funding_stage_ids: ["series_b"]
+    hr_structure_recommendation: "People lead with specialist support across Talent, HR Operations, and Rewards; increase rigor while avoiding unnecessary complexity."
+    recommended_practices:
+      - "Implement leveling/pay bands and documented compensation review governance."
+      - "Stand up leadership development for first-line managers and emerging leaders."
+      - "Institutionalize ER intake, investigation workflow, and escalation standards."
+      - "Use engagement/attrition signals to target retention interventions by team/manager."
+    potential_risks:
+      - "Role ambiguity between generalist and specialist ownership slows execution."
+      - "Compensation inconsistency creates fairness and retention risk."
+      - "Manager capability variance becomes a major performance bottleneck."
+    source_ids: ["aihr_startups", "hibob_startup_challenges", "hr_assessment_report_template"]
+
+  - id: size_100_250_operating_model
+    size_stage_ids: ["100-250"]
+    hr_structure_recommendation: "Head of People with pod-style operating model (People Ops, Talent, Rewards/HRBP), backed by clear governance and data operations."
+    recommended_practices:
+      - "Run quarterly people strategy and workforce-planning reviews tied to business plans."
+      - "Establish HR data quality audits and reporting standards for leadership decisions."
+      - "Scale succession planning and development architecture for critical roles."
+      - "Add change-management communication practices during process/policy transitions."
+    potential_risks:
+      - "Manual cross-system handoffs create reporting and execution errors."
+      - "Scaling programs without adoption planning reduces impact and trust."
+      - "Governance gaps increase policy inconsistency and audit risk."
+    source_ids: ["aihr_startups", "hibob_startup_challenges", "hr_copilot_spec_v1"]
+
+  - id: size_250_plus_strategic
+    size_stage_ids: ["250+"]
+    funding_stage_ids: ["series_c_plus"]
+    hr_structure_recommendation: "Strategic HR function with specialized teams and strong governance integrated with enterprise planning cycles."
+    recommended_practices:
+      - "Maintain enterprise policy governance and legal review cadence across jurisdictions."
+      - "Use KPI dashboards for compliance closure, manager capability, retention, and rewards health."
+      - "Align people strategy, org design, and workforce planning with annual business planning."
+      - "Continuously improve employee experience while preserving operational discipline."
+    potential_risks:
+      - "Over-complex processes can reduce execution speed and manager adoption."
+      - "Inconsistent governance across teams creates uneven employee experience."
+      - "Weak operating cadence can decouple HR strategy from business outcomes."
+    source_ids: ["aihr_startups", "hibob_startup_challenges", "hr_copilot_spec_v1", "hr_assessment_report_template"]
+
+expectations:
+  - id: hr_strategy_documented
+    area: strategy
+    claim: "A documented people/HR strategy is aligned to business objectives."
+    severity_if_missing: high
+    evidence_queries:
+      - "HR strategy"
+      - "people strategy"
+      - "strategic HR plan"
+      - "HR objectives"
+      - "aligned to business strategy"
+    snapshot_fields: []
+    follow_up_question: "Do you have a documented HR strategy linked to current business priorities?"
+
+  - id: executive_hr_partnership
+    area: strategy
+    claim: "HR is involved in strategic planning discussions with executive leadership."
+    severity_if_missing: high
+    evidence_queries:
+      - "executive planning"
+      - "strategic planning discussions"
+      - "HR leadership meeting"
+      - "board or leadership cadence"
+    snapshot_fields: []
+    follow_up_question: "How often does HR participate in executive strategy planning?"
+
+  - id: workforce_planning_scenarios
+    area: strategy
+    claim: "Workforce planning uses scenario-based staffing assumptions."
+    severity_if_missing: medium
+    evidence_queries:
+      - "workforce planning"
+      - "headcount planning"
+      - "hiring plan"
+      - "scenario planning"
+    snapshot_fields: ["headcount", "headcount_range"]
+    follow_up_question: "Do you maintain base/stretch/downturn headcount scenarios?"
+
+  - id: handbook_current
+    area: compliance
+    claim: "Employee handbook is current and reviewed regularly."
+    severity_if_missing: high
+    evidence_queries:
+      - "employee handbook"
+      - "handbook review"
+      - "policy updates"
+    snapshot_fields: ["policies.employee_handbook"]
+    follow_up_question: "Do you have a current employee handbook and last review date?"
+    compliance: true
+
+  - id: anti_harassment_policy
+    area: compliance
+    claim: "Anti-harassment policy and reporting channels are documented."
+    severity_if_missing: critical
+    evidence_queries:
+      - "anti-harassment policy"
+      - "harassment reporting"
+      - "retaliation"
+      - "complaint channel"
+    snapshot_fields: ["policies.anti_harassment_policy", "hris_data.mandatory_training_tracking"]
+    follow_up_question: "Is anti-harassment and required bystander training completion tracked by location?"
+    compliance: true
+
+  - id: leave_overtime_coverage
+    area: compliance
+    claim: "Leave and overtime policies are documented with eligibility rules."
+    severity_if_missing: critical
+    evidence_queries:
+      - "leave policy"
+      - "time off policy"
+      - "overtime policy"
+      - "exempt non-exempt"
+    snapshot_fields: ["policies.leave_policy", "policies.overtime_policy"]
+    follow_up_question: "Are leave and overtime eligibility rules clearly documented for all jurisdictions?"
+    compliance: true
+
+  - id: offer_letter_templates
+    area: compliance
+    claim: "Standard offer letter and confidentiality/IP templates are maintained."
+    severity_if_missing: high
+    evidence_queries:
+      - "offer letter"
+      - "employment template"
+      - "confidential information and invention assignment"
+      - "CIIAA"
+    snapshot_fields: ["hiring.offer_approval"]
+    follow_up_question: "Are offer and confidentiality/IP templates standardized and current?"
+    compliance: true
+
+  - id: worker_classification_controls
+    area: compliance
+    claim: "Employee/contractor and exempt/non-exempt classification controls are documented."
+    severity_if_missing: critical
+    evidence_queries:
+      - "independent contractor classification"
+      - "exempt non-exempt"
+      - "worker classification"
+      - "FLSA"
+    snapshot_fields: ["policies.overtime_policy"]
+    follow_up_question: "How is classification reviewed when roles or work patterns change?"
+    compliance: true
+
+  - id: i9_recordkeeping_controls
+    area: compliance
+    claim: "I-9 and other sensitive employment records follow compliant storage and audit practices."
+    severity_if_missing: high
+    evidence_queries:
+      - "I-9"
+      - "employment eligibility verification"
+      - "separate files"
+      - "recordkeeping"
+    snapshot_fields: []
+    follow_up_question: "Are I-9 records separated and periodically audited?"
+    compliance: true
+
+  - id: retaliation_reporting_channels
+    area: compliance
+    claim: "Retaliation protections and reporting channels are clear to employees."
+    severity_if_missing: high
+    evidence_queries:
+      - "retaliation policy"
+      - "speak up channel"
+      - "ethics hotline"
+      - "complaint reporting"
+    snapshot_fields: ["policies.anti_harassment_policy"]
+    follow_up_question: "Can employees report concerns anonymously and without fear of retaliation?"
+    compliance: true
+
+  - id: structured_interviewing
+    area: talent_acquisition
+    claim: "Hiring uses structured, job-relevant and repeatable interview practices."
+    severity_if_missing: high
+    evidence_queries:
+      - "structured interviews"
+      - "interview rubric"
+      - "hiring process"
+      - "candidate assessment"
+    snapshot_fields: ["hiring.structured_interviews"]
+
+  - id: job_descriptions_ada_compliant
+    area: talent_acquisition
+    claim: "Job descriptions are current and include legally defensible requirements."
+    severity_if_missing: medium
+    evidence_queries:
+      - "job descriptions"
+      - "ADA"
+      - "essential functions"
+      - "role requirements"
+    snapshot_fields: ["hiring.job_architecture"]
+
+  - id: candidate_funnel_metrics
+    area: talent_acquisition
+    claim: "Recruiting metrics (time to fill, acceptance, source quality) are tracked and reviewed."
+    severity_if_missing: medium
+    evidence_queries:
+      - "time to fill"
+      - "acceptance rate"
+      - "cost per hire"
+      - "recruiting metrics"
+    snapshot_fields: []
+
+  - id: pay_transparency_compliance
+    area: talent_acquisition
+    claim: "Hiring practices address pay-transparency and salary-history constraints where applicable."
+    severity_if_missing: high
+    evidence_queries:
+      - "pay transparency"
+      - "salary history"
+      - "job posting pay range"
+      - "compensation disclosure"
+    snapshot_fields: []
+    compliance: true
+
+  - id: onboarding_basics
+    area: onboarding
+    claim: "New hires follow a standard onboarding program."
+    severity_if_missing: high
+    evidence_queries:
+      - "onboarding checklist"
+      - "new hire onboarding"
+      - "orientation program"
+    snapshot_fields: ["onboarding.onboarding_program"]
+
+  - id: onboarding_buddy_feedback
+    area: onboarding
+    claim: "Onboarding includes a support mechanism (buddy/mentor) and captures new-hire feedback."
+    severity_if_missing: medium
+    evidence_queries:
+      - "onboarding buddy"
+      - "new hire feedback"
+      - "onboarding survey"
+      - "mentor program"
+    snapshot_fields: []
+
+  - id: manager_training
+    area: manager_capability
+    claim: "Managers receive baseline people-management training."
+    severity_if_missing: high
+    evidence_queries:
+      - "manager training"
+      - "manager enablement"
+      - "feedback documentation"
+    snapshot_fields: ["manager_enablement.manager_training"]
+
+  - id: one_on_one_cadence
+    area: manager_capability
+    claim: "Managers run a consistent 1:1 cadence."
+    severity_if_missing: medium
+    evidence_queries:
+      - "one on one"
+      - "1:1 cadence"
+      - "manager check in"
+    snapshot_fields: ["manager_enablement.one_on_one_cadence"]
+
+  - id: performance_cycle
+    area: performance_mgmt
+    claim: "Performance review cycle is defined and repeated."
+    severity_if_missing: high
+    evidence_queries:
+      - "performance review cycle"
+      - "calibration"
+      - "review timeline"
+    snapshot_fields: ["performance.review_cycle"]
+
+  - id: goal_framework
+    area: performance_mgmt
+    claim: "A consistent goal framework is used across teams."
+    severity_if_missing: medium
+    evidence_queries:
+      - "goal framework"
+      - "OKR"
+      - "goal-setting"
+    snapshot_fields: ["performance.goal_framework"]
+
+  - id: leadership_development_programs
+    area: talent_development
+    claim: "Leadership and management development programs are established."
+    severity_if_missing: medium
+    evidence_queries:
+      - "leadership development"
+      - "management development"
+      - "manager coaching program"
+    snapshot_fields: []
+
+  - id: succession_planning
+    area: talent_development
+    claim: "Succession planning exists for key roles."
+    severity_if_missing: medium
+    evidence_queries:
+      - "succession plan"
+      - "critical roles"
+      - "bench strength"
+      - "internal pipeline"
+    snapshot_fields: []
+
+  - id: training_roi_tracking
+    area: talent_development
+    claim: "Learning and development impact is measured and reviewed."
+    severity_if_missing: low
+    evidence_queries:
+      - "training effectiveness"
+      - "learning ROI"
+      - "development outcomes"
+    snapshot_fields: []
+
+  - id: leveling_framework
+    area: compensation
+    claim: "Job leveling framework exists and is used."
+    severity_if_missing: high
+    evidence_queries:
+      - "leveling framework"
+      - "job family"
+      - "career ladder"
+    snapshot_fields: ["comp_leveling.leveling_framework"]
+
+  - id: pay_bands
+    area: compensation
+    claim: "Pay bands are documented and decision rules are clear."
+    severity_if_missing: high
+    evidence_queries:
+      - "pay band"
+      - "salary band"
+      - "compensation band"
+    snapshot_fields: ["comp_leveling.pay_bands"]
+
+  - id: compensation_review_cycle
+    area: compensation
+    claim: "Compensation review cycle and adjustment process are documented."
+    severity_if_missing: medium
+    evidence_queries:
+      - "compensation review cycle"
+      - "merit cycle"
+      - "pay adjustments"
+    snapshot_fields: ["comp_leveling.compensation_review_cycle"]
+
+  - id: compensation_philosophy
+    area: compensation
+    claim: "Compensation philosophy is documented and used in decision-making."
+    severity_if_missing: medium
+    evidence_queries:
+      - "compensation philosophy"
+      - "pay philosophy"
+      - "pay for performance"
+    snapshot_fields: []
+
+  - id: hris_system
+    area: systems
+    claim: "A single HRIS system of record is identified."
+    severity_if_missing: high
+    evidence_queries:
+      - "HRIS"
+      - "system of record"
+      - "Workday"
+      - "BambooHR"
+      - "Rippling"
+    snapshot_fields: ["hris_data.hris_system"]
+
+  - id: data_audit_cadence
+    area: systems
+    claim: "HR data quality audits run on a defined cadence."
+    severity_if_missing: medium
+    evidence_queries:
+      - "data audit cadence"
+      - "HR data quality"
+      - "data reconciliation"
+    snapshot_fields: ["hris_data.data_audit_cadence"]
+
+  - id: analytics_for_leaders
+    area: systems
+    claim: "Leaders use HR analytics to inform business decisions."
+    severity_if_missing: medium
+    evidence_queries:
+      - "HR analytics"
+      - "people analytics"
+      - "leader dashboard"
+      - "data-driven HR decisions"
+    snapshot_fields: []
+
+  - id: self_service_portal
+    area: systems
+    claim: "Employees have self-service access to employment information."
+    severity_if_missing: low
+    evidence_queries:
+      - "self-service portal"
+      - "employee portal"
+      - "HR self service"
+    snapshot_fields: []
+
+  - id: mandatory_training_tracking
+    area: compliance
+    claim: "Legally required training completion is tracked by jurisdiction and role."
+    severity_if_missing: high
+    evidence_queries:
+      - "mandatory training"
+      - "harassment training tracking"
+      - "training completion"
+      - "jurisdiction training requirements"
+    snapshot_fields: ["hris_data.mandatory_training_tracking"]
+    compliance: true
+
+  - id: er_case_process
+    area: retention
+    claim: "Employee relations intake and escalation process exists."
+    severity_if_missing: critical
+    evidence_queries:
+      - "employee relations"
+      - "case intake"
+      - "escalation process"
+      - "investigation workflow"
+    snapshot_fields: ["er_retention.er_case_process"]
+    compliance: true
+
+  - id: engagement_signals
+    area: retention
+    claim: "Attrition and engagement signals are tracked."
+    severity_if_missing: medium
+    evidence_queries:
+      - "attrition"
+      - "turnover"
+      - "engagement survey"
+      - "pulse survey"
+    snapshot_fields: ["er_retention.attrition_rate", "er_retention.engagement_survey"]
+
+  - id: benefits_governance
+    area: benefits
+    claim: "Benefits eligibility rules, ownership, and vendor governance are documented."
+    severity_if_missing: medium
+    evidence_queries:
+      - "benefits eligibility"
+      - "benefits policy"
+      - "benefits broker"
+      - "vendor governance"
+    snapshot_fields: ["benefits.benefits_eligibility_policy", "benefits.benefits_broker"]
+
+  - id: mental_health_and_wellness_support
+    area: benefits
+    claim: "Mental health and wellness support options are available and communicated."
+    severity_if_missing: low
+    evidence_queries:
+      - "EAP"
+      - "mental health benefits"
+      - "wellness program"
+      - "employee wellbeing"
+    snapshot_fields: []
+
+  - id: deib_strategy_and_metrics
+    area: deib
+    claim: "DEIB strategy and metrics are defined and reviewed."
+    severity_if_missing: medium
+    evidence_queries:
+      - "DEIB strategy"
+      - "diversity goals"
+      - "inclusion metrics"
+      - "equity metrics"
+    snapshot_fields: []
+
+  - id: offboarding_controls
+    area: offboarding
+    claim: "Offboarding controls cover final pay, benefits transitions, access revocation, and asset recovery."
+    severity_if_missing: high
+    evidence_queries:
+      - "offboarding checklist"
+      - "final paycheck"
+      - "COBRA"
+      - "access revocation"
+      - "asset recovery"
+      - "exit interview"
+    snapshot_fields: []
+    compliance: true
+
+  - id: change_management_communication
+    area: change_management
+    claim: "People-impacting changes are communicated with clear ownership and manager enablement."
+    severity_if_missing: medium
+    evidence_queries:
+      - "change management"
+      - "organizational change communication"
+      - "manager cascade"
+      - "change plan"
+    snapshot_fields: []
+
+  - id: data_privacy_controls
+    area: data_privacy
+    claim: "HR data privacy controls and responsibilities are clearly defined."
+    severity_if_missing: high
+    evidence_queries:
+      - "HR data privacy"
+      - "employee data protection"
+      - "sensitive data handling"
+      - "privacy policy"
+    snapshot_fields: ["policies.data_privacy_policy"]
+    compliance: true
+
+  - id: checklist_reconciliation
+    area: systems
+    claim: "Checklist responses are reconciled against source artifacts before conclusions are finalized."
+    severity_if_missing: medium
+    evidence_queries:
+      - "assessment checklist"
+      - "self-reported"
+      - "artifact review"
+      - "document review"
+      - "source reconciliation"
+    snapshot_fields: []
+    follow_up_question: "Are checklist responses validated against source documents before issuing recommendations?"
+
+prompt_overrides:
+  snapshot_guidance: >
+    Favor evidence that directly indicates whether a control exists, is missing, or is
+    ambiguous. Keep citations as complete standalone sentences and avoid clipped excerpts.
+  synthesis_style: >
+    Consultant-grade and practical. Tie observations to startup stage and size context, and
+    clearly separate confirmed findings from hypotheses that need validation.

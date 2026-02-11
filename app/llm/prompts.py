@@ -7,34 +7,60 @@ from app.models import TextChunk
 
 
 SNAPSHOT_SYSTEM_PROMPT = """
-You are an HR diagnostic extraction engine.
+You extract HR facts into the provided JSON schema.
 Rules:
-1) Use only the provided chunk text.
-2) Never invent facts or metrics. If a value is not explicit, return null and mark evidence_map status as "not_provided_in_sources".
-3) Extract when explicit: if a sentence clearly states a fact, record it even if wording is varied.
-   Examples of explicit statements:
-   - policy existence: "we have an anti-harassment policy", "our sick time policy states..."
-   - system usage: "enter time away in Workday", "we use BambooHR as HRIS"
-4) Ignore navigation/TOC/menu labels and index lists as evidence. Short labels alone (e.g., "Time Off", "Job Families") are not sufficient.
-5) Return `evidence_map` as an array of items:
-   {"field_path": string, "status": "present"|"not_provided_in_sources"|"explicitly_missing"|"not_assessed", "citations": [{"chunk_id": string, "snippet": string}]}
-6) For evidence_map citations, always include chunk_id and a short verbatim snippet from the provided chunk.
-7) Citations must be sentence-like (not labels): prefer snippets with punctuation and enough context to stand alone.
-8) If evidence is missing, use status "not_provided_in_sources" and citations [].
-9) Return strict JSON that matches the provided schema.
+1) Use only the provided source chunks or curated evidence payload. Never use outside knowledge.
+2) Never invent facts. If a value is not explicitly stated, set it to null.
+3) Only use sentence-level evidence. Citations must be 1-2 complete, standalone sentences copied verbatim.
+   Do not cite headings, menus, labels, or clipped fragments.
+4) Evidence map:
+   - If evidence supports the field: status "present" and include citations.
+   - If evidence explicitly says it is missing: status "explicitly_missing" and include citations.
+   - Otherwise: status "not_provided_in_sources" with citations [].
+5) Return strict JSON matching the schema.
+6) Assessment context is not evidence; use it only to interpret fields.
 """.strip()
 
-PLAN_SYSTEM_PROMPT = """
-You produce a 30/60/90-day HR action plan.
+SNAPSHOT_ANALYST_SYSTEM_PROMPT = """
+You are an HR evidence analyst.
 Rules:
-1) Use only snapshot and findings provided.
-2) Do not introduce new facts.
-3) Every action must include evidence citations from findings. If no evidence exists, use a single citation {"chunk_id":"not_found","snippet":"not found"}.
-4) If a step depends on unknown inputs, label it "Conditional: if X is not in place...".
-5) Do not assume specific owners unless supported by findings; otherwise use Owner: TBD language.
-6) Keep wording client-ready and concise.
+1) Use only the provided evidence snippets; never use outside knowledge.
+2) Evaluate each field independently in HR-native language.
+3) Prefer explicit policy/process statements over cultural or role-level statements.
+4) If evidence conflicts, mark conflict; do not force a winner.
+5) If evidence is weak/indirect, mark ambiguous and set needs_confirmation=true.
+6) Keep reasoning concise and practical.
 7) Return strict JSON matching the schema.
 """.strip()
+
+SNAPSHOT_RESOLVER_SYSTEM_PROMPT = """
+You convert analyst judgments into final CompanyPeopleSnapshot JSON.
+Rules:
+1) Use only analyst judgments and provided evidence.
+2) Apply conservative resolution:
+   - Set scalar values only for explicit, high-confidence support.
+   - Keep null when ambiguous/conflicting/weak.
+3) Preserve evidence_map citations and statuses.
+4) Do not invent values.
+5) Return strict JSON matching the schema.
+""".strip()
+
+DISCOVERY_SYSTEM_PROMPT = """
+You synthesize additional HR observations not fully covered by the rubric.
+Rules:
+1) Use only provided evidence snippets.
+2) Every observation must cite at least one snippet id, using complete standalone sentence evidence.
+3) Do not infer missing controls from generic values/culture statements.
+4) If evidence is weak or indirect, label it as a hypothesis and include a concrete follow-up question.
+5) Keep findings concise, practical, and stage-aware.
+6) Prefer observations that add signal beyond rubric fields already extracted.
+7) Return strict JSON matching schema.
+8) Assessment context is not evidence.
+""".strip()
+
+
+def _compact_json(payload: Dict[str, Any]) -> str:
+    return json.dumps(payload, separators=(",", ":"), ensure_ascii=False)
 
 
 def chunks_to_prompt_text(chunks: List[TextChunk], max_chars_per_chunk: int = 1400) -> str:
@@ -56,12 +82,15 @@ def build_snapshot_user_prompt(
     *,
     chunks: List[TextChunk],
     tracked_fields: Iterable[str],
+    assessment_context: str | None = None,
     prompt_overrides: Dict[str, Any] | None = None,
 ) -> str:
     overrides = prompt_overrides or {}
     payload = {
         "task": "Extract CompanyPeopleSnapshot",
         "tracked_fields_for_evidence_map": list(tracked_fields),
+        "assessment_context": assessment_context or "",
+        "citation_rule": "Citations must be 1-2 complete standalone sentences copied verbatim from source text.",
         "additional_guidance": overrides.get("snapshot_guidance", ""),
     }
     return (
@@ -71,18 +100,87 @@ def build_snapshot_user_prompt(
     )
 
 
-def build_plan_user_prompt(
+def build_snapshot_evidence_prompt(
     *,
-    stage_label: str,
-    snapshot_payload: Dict[str, Any],
-    findings_payload: List[Dict[str, Any]],
+    tracked_fields: Iterable[str],
+    evidence_by_field: Dict[str, List[Dict[str, Any]]],
+    company_context: str | None = None,
+    assessment_context: str | None = None,
     prompt_overrides: Dict[str, Any] | None = None,
 ) -> str:
     overrides = prompt_overrides or {}
-    task = {
-        "stage_label": stage_label,
-        "style": overrides.get("plan_style", "pragmatic, consultant-ready"),
-        "snapshot": snapshot_payload,
-        "findings": findings_payload,
+    payload = {
+        "task": "Extract CompanyPeopleSnapshot from curated evidence",
+        "tracked_fields_for_evidence_map": list(tracked_fields),
+        "company_context": company_context or "",
+        "assessment_context": assessment_context or "",
+        "additional_guidance": overrides.get("snapshot_guidance", ""),
+        "evidence_by_field": evidence_by_field,
     }
-    return f"Generate plan JSON for this payload:\n{json.dumps(task, indent=2)}"
+    return f"Evidence payload:\n{_compact_json(payload)}"
+
+
+def build_snapshot_analysis_prompt(
+    *,
+    tracked_fields: Iterable[str],
+    evidence_by_field: Dict[str, List[Dict[str, Any]]],
+    retrieval_statuses: Dict[str, str] | None = None,
+    retrieval_queries: Dict[str, List[str]] | None = None,
+    company_context: str | None = None,
+    assessment_context: str | None = None,
+    prompt_overrides: Dict[str, Any] | None = None,
+) -> str:
+    overrides = prompt_overrides or {}
+    payload = {
+        "task": "Analyze HR evidence quality and field-level support",
+        "tracked_fields": list(tracked_fields),
+        "company_context": company_context or "",
+        "assessment_context": assessment_context or "",
+        "retrieval_statuses": retrieval_statuses or {},
+        "retrieval_queries": retrieval_queries or {},
+        "additional_guidance": overrides.get("snapshot_guidance", ""),
+        "evidence_by_field": evidence_by_field,
+    }
+    return f"Evidence analysis payload:\n{_compact_json(payload)}"
+
+
+def build_snapshot_resolver_prompt(
+    *,
+    tracked_fields: Iterable[str],
+    field_assessments: List[Dict[str, Any]],
+    company_context: str | None = None,
+    assessment_context: str | None = None,
+    prompt_overrides: Dict[str, Any] | None = None,
+) -> str:
+    overrides = prompt_overrides or {}
+    payload = {
+        "task": "Resolve analyst judgments into CompanyPeopleSnapshot",
+        "tracked_fields": list(tracked_fields),
+        "company_context": company_context or "",
+        "assessment_context": assessment_context or "",
+        "additional_guidance": overrides.get("snapshot_guidance", ""),
+        "field_assessments": field_assessments,
+        "note": "Field assessments already include citations; do not request additional evidence context.",
+    }
+    return f"Snapshot resolver payload:\n{_compact_json(payload)}"
+
+
+def build_discovery_user_prompt(
+    *,
+    stage_label: str,
+    evidence_catalog: List[Dict[str, Any]],
+    max_findings: int,
+    assessment_context: str | None = None,
+    prompt_overrides: Dict[str, Any] | None = None,
+) -> str:
+    overrides = prompt_overrides or {}
+    payload = {
+        "task": "Identify additional HR observations not fully covered by rubric expectations.",
+        "stage_label": stage_label,
+        "max_findings": max_findings,
+        "assessment_context": assessment_context or "",
+        "novelty_rule": "Prefer observations that add signal beyond fields already covered by rubric extraction.",
+        "style": overrides.get("synthesis_style", "direct, evidence-grounded"),
+        "evidence_catalog": evidence_catalog,
+    }
+    return f"Generate observation JSON:\n{_compact_json(payload)}"

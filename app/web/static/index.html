@@ -3,74 +3,82 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>People Systems Diagnostic</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Newsreader:opsz,wght@6..72,500;6..72,700&display=swap" rel="stylesheet" />
+    <title>HRReporter</title>
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
-    <div class="ambient ambient-a"></div>
-    <div class="ambient ambient-b"></div>
+    <div class="bg-shape bg-a"></div>
+    <div class="bg-shape bg-b"></div>
 
-    <main class="shell">
-      <header class="hero card">
-        <p class="kicker">HR REPORTER STUDIO</p>
-        <h1>People Systems Diagnostic</h1>
-        <p class="subtitle">
-          One workflow for local and AWS deployment. Submit text, files, and URLs together,
-          then receive a structured client-ready report.
-        </p>
-        <div id="config-badges" class="badges"></div>
-      </header>
+    <header class="topbar">
+      <div>
+        <h1>HRReporter</h1>
+        <p>Scale-aware HR risk scan with evidence-grounded findings.</p>
+      </div>
+      <div id="config-badges" class="badge-row"></div>
+    </header>
 
-      <section class="layout">
-        <section class="card composer">
-          <h2>Input</h2>
-          <form id="analysis-form">
-            <label class="field">
-              <span>Paste Company Notes</span>
-              <textarea id="text" name="text" rows="8" placeholder="Paste discovery notes, interviews, policy snippets, hiring plans, manager pain points, etc."></textarea>
-            </label>
+    <main class="layout">
+      <section class="panel input-panel">
+        <h2>Inputs</h2>
+        <p class="muted">Paste context, drop files, and add company URLs.</p>
 
-            <label class="field">
-              <span>URL Sources</span>
-              <textarea id="urls" name="urls" rows="3" placeholder="Paste URL(s), one per line or comma-separated"></textarea>
-            </label>
+        <form id="analysis-form" class="form-stack">
+          <label for="text">Pasted Text</label>
+          <textarea id="text" name="text" rows="8" placeholder="Paste notes, interview output, HR docs, or internal context..."></textarea>
 
-            <div id="url-drop" class="dropzone drop-url">
-              <p>Drop URL text here</p>
-              <small>Links are auto-detected from dropped text.</small>
-            </div>
+          <label for="urls">URLs</label>
+          <textarea id="urls" name="urls" rows="5" placeholder="https://example.com/people-policy&#10;https://example.com/benefits"></textarea>
 
-            <div id="file-drop" class="dropzone drop-file">
-              <input id="files" type="file" name="files" multiple hidden />
-              <p>Drag and drop files</p>
-              <small>TXT, MD, PDF, DOCX. Click to browse or paste files from clipboard.</small>
-              <button id="browse-btn" type="button" class="btn secondary">Choose Files</button>
-            </div>
-
-            <div id="file-list" class="file-list"></div>
-
-            <div class="actions">
-              <button id="submit-btn" type="submit" class="btn primary">Run Assessment</button>
-              <button id="clear-btn" type="button" class="btn secondary">Clear</button>
-              <span id="status" class="status"></span>
-            </div>
-          </form>
-        </section>
-
-        <section class="card output" id="output-panel" hidden>
-          <div class="output-head">
-            <h2>Report</h2>
-            <div class="output-actions">
-              <button id="copy-md" type="button" class="btn secondary">Copy Markdown</button>
-              <button id="download-json" type="button" class="btn secondary">Download JSON</button>
+          <div class="drop-grid">
+            <div id="file-drop" class="dropzone">
+              <h3>Files</h3>
+              <p>Drag/drop .txt .md .pdf .docx</p>
+              <button id="browse-btn" type="button">Browse files</button>
+              <input id="files" name="files" type="file" multiple hidden />
             </div>
           </div>
-          <p id="meta" class="meta"></p>
-          <pre id="report-preview" class="report-preview"></pre>
-        </section>
+
+          <div id="file-list" class="file-list"></div>
+
+          <div class="action-row">
+            <button id="submit-btn" type="submit" class="primary">Run Assessment</button>
+            <button id="clear-btn" type="button" class="ghost">Reset</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="panel results-panel">
+        <h2>Analysis</h2>
+        <div id="status" class="status"></div>
+
+        <div class="progress-wrap" id="progress-wrap" hidden>
+          <div class="progress-bar"><span id="progress-fill"></span></div>
+          <ul id="progress-steps" class="progress-steps">
+            <li data-step="ingest">Ingest + chunk</li>
+            <li data-step="route">Route + retrieve</li>
+            <li data-step="synthesize">Synthesize findings</li>
+            <li data-step="render">Render report</li>
+          </ul>
+        </div>
+
+        <div id="output-panel" hidden>
+          <div id="meta" class="meta"></div>
+
+          <div class="report-shell">
+            <div class="report-header">
+              <h3>Report</h3>
+              <p class="muted">Formatted markdown output.</p>
+            </div>
+            <article id="report-preview" class="markdown-view"></article>
+          </div>
+          <div class="action-row">
+            <button id="copy-md" type="button" class="ghost">Copy Markdown</button>
+            <button id="download-json" type="button" class="ghost">Download JSON</button>
+            <button id="download-docx" type="button" class="ghost">Download Word (.docx)</button>
+            <button id="download-pdf" type="button" class="ghost">Download PDF</button>
+          </div>
+        </div>
       </section>
     </main>
 

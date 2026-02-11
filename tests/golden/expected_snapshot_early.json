@@ -20,8 +20,7 @@
     "offer_approval": null
   },
   "onboarding": {
-    "onboarding_program": false,
-    "role_plan_30_60_90": false
+    "onboarding_program": false
   },
   "manager_enablement": {
     "manager_training": false,
@@ -79,15 +78,6 @@
         {
           "chunk_id": "doc-001-c001",
           "snippet": "no manager training program exists"
-        }
-      ]
-    },
-    "onboarding.role_plan_30_60_90": {
-      "status": "present",
-      "citations": [
-        {
-          "chunk_id": "doc-001-c001",
-          "snippet": "no documented 30/60/90 plans"
         }
       ]
     }

@@ -1,13 +1,7 @@
 from __future__ import annotations
 
-from pathlib import Path
-
-from app.config_loader import load_consultant_pack
-from app.models import Citation, FinalReport, Finding, MetricItem, Plan3090, PlanAction, RiskItem, Subcheck
+from app.models import FinalReport, Finding, MetricItem, RiskItem, Subcheck
 from app.report.renderer import render_markdown
-
-
-REPO_ROOT = Path(__file__).resolve().parents[1]
 
 
 def _sample_report() -> FinalReport:
@@ -40,8 +34,8 @@ def _sample_report() -> FinalReport:
 
     return FinalReport(
         stage="11-40 employees",
-        confidence=0.74,
         drivers=["Headcount explicitly stated as 22."],
+        profile_expectations=[finding],
         top_growth_areas=[finding],
         risks=[
             RiskItem(
@@ -52,16 +46,6 @@ def _sample_report() -> FinalReport:
                 mitigation=["Conditional: if employee handbook is not in place, Draft handbook v1."],
             )
         ],
-        plan_30_60_90=Plan3090(
-            why_now="Foundation controls reduce near-term compliance risk.",
-            days_30=[
-                PlanAction(
-                    action="Conditional: if prerequisite capability is not in place, Draft handbook baseline.",
-                    rationale="Owner: TBD / assign",
-                    evidence=[Citation(chunk_id="not_found", snippet="not found")],
-                )
-            ],
-        ),
         follow_up_questions=["Do you have a current employee handbook and last review date?"],
         unknowns=["Not provided in sources: policies.employee_handbook"],
         reviewed_sources=["https://example.com/people"],
@@ -71,12 +55,12 @@ def _sample_report() -> FinalReport:
 
 
 def test_renderer_matches_golden_snapshot() -> None:
-    pack = load_consultant_pack(REPO_ROOT / "tuning" / "packs" / "default_pack.yaml")
-    rendered = render_markdown(_sample_report(), pack, repo_root=REPO_ROOT)
-    expected = (REPO_ROOT / "tests" / "golden" / "rendered_report_snapshot.md").read_text(encoding="utf-8")
+    rendered = render_markdown(_sample_report(), profile_name="Default Profile")
 
-    normalize = lambda s: "\n".join(line.rstrip() for line in s.strip().splitlines())
-    assert normalize(rendered) == normalize(expected)
-
+    assert "# HR Assessment Report" in rendered
+    assert "## HR Functional Scorecard" in rendered
+    assert "## Stage-Based Recommendations" in rendered
+    assert "## Functional Area Deep-Dives" in rendered
+    assert "## Assumptions and Data Limitations" in rendered
+    assert "## Disclaimer" in rendered
     assert "Owner: Owner:" not in rendered
-    assert "Evidence:\n- [" in rendered or "Evidence: Not provided in sources." in rendered

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
+import csv
 from datetime import datetime, timezone
 import hashlib
 import logging
@@ -18,7 +19,7 @@ from app.models import RawDocument
 from app.ingest.text_normalize import normalize_text
 
 
-SUPPORTED_EXTENSIONS = {".txt", ".md", ".pdf", ".docx"}
+SUPPORTED_EXTENSIONS = {".txt", ".md", ".pdf", ".docx", ".csv"}
 DIRECTORY_LINK_KEYWORDS = [
     "policy",
     "handbook",
@@ -33,6 +34,81 @@ DIRECTORY_LINK_KEYWORDS = [
     "relations",
     "harassment",
     "workday",
+]
+HR_URL_PATH_TOKENS = [
+    "people",
+    "policy",
+    "policies",
+    "handbook",
+    "hiring",
+    "talent",
+    "onboarding",
+    "performance",
+    "manager",
+    "benefits",
+    "leave",
+    "overtime",
+    "harassment",
+    "employment-law",
+    "risk-management",
+    "dispute-resolution",
+    "publiccompanyresources",
+    "legal/employment",
+]
+HR_CONTENT_TOKENS = [
+    "employee handbook",
+    "anti-harassment",
+    "harassment policy",
+    "leave policy",
+    "overtime",
+    "manager training",
+    "performance review",
+    "goal framework",
+    "pay band",
+    "leveling",
+    "hris",
+    "benefits eligibility",
+    "employee relations",
+    "offboarding",
+    "classification",
+    "exempt",
+    "non-exempt",
+    "offer letter",
+    "onboarding",
+]
+STAGE_SIGNAL_PATTERNS = [
+    re.compile(r"\bheadcount\b", flags=re.IGNORECASE),
+    re.compile(r"\b\d{2,5}\s+(employees|employee|fte|team members)\b", flags=re.IGNORECASE),
+    re.compile(r"\bseries\s+(a|b|c|d|e|f)\b", flags=re.IGNORECASE),
+    re.compile(r"\bpre-ipo\b|\bipo\b|\bpublic company\b", flags=re.IGNORECASE),
+]
+IRRELEVANT_URL_TOKENS = [
+    "press-release",
+    "blog",
+    "newsroom",
+    "events",
+    "webinar",
+    "podcast",
+    "investor",
+    "marketing",
+    "cookie",
+    "privacy",
+    "terms",
+    "pricing",
+    "sales",
+    "install",
+]
+NON_US_LOCALE_TOKENS = [
+    "india",
+    "singapore",
+    "australia",
+    "germany",
+    "france",
+    "uk",
+    "united-kingdom",
+    "emea",
+    "apac",
+    "latam",
 ]
 _DOMAIN_LAST_REQUEST_TS: Dict[str, float] = {}
 _DOMAIN_LOCK = threading.Lock()
@@ -99,6 +175,36 @@ def _load_docx(path: Path) -> str:
     return normalize_text("\n".join(p.text for p in document.paragraphs))
 
 
+def _load_csv(path: Path) -> str:
+    rows: List[List[str]] = []
+    with path.open("r", encoding="utf-8", errors="ignore", newline="") as f:
+        reader = csv.reader(f)
+        for row in reader:
+            rows.append([str(cell).strip() for cell in row])
+
+    if not rows:
+        return ""
+
+    headers = rows[0]
+    lines: List[str] = []
+    if any(header.strip() for header in headers):
+        lines.append("CSV headers: " + " | ".join(header.strip() or f"column_{idx + 1}" for idx, header in enumerate(headers)))
+
+    for row in rows[1:]:
+        parts: List[str] = []
+        for idx, value in enumerate(row):
+            cleaned = value.strip()
+            if not cleaned:
+                continue
+            header = headers[idx].strip() if idx < len(headers) else f"column_{idx + 1}"
+            header = header or f"column_{idx + 1}"
+            parts.append(f"{header}: {cleaned}")
+        if parts:
+            lines.append(" | ".join(parts))
+
+    return normalize_text("\n".join(lines))
+
+
 def load_file_text(path: Path) -> str:
     suffix = path.suffix.lower()
     if suffix in {".txt", ".md"}:
@@ -107,6 +213,8 @@ def load_file_text(path: Path) -> str:
         return _load_pdf(path)
     if suffix == ".docx":
         return _load_docx(path)
+    if suffix == ".csv":
+        return _load_csv(path)
     raise ValueError(f"Unsupported file type: {suffix}")
 
 
@@ -296,12 +404,62 @@ def _extract_links(html: str, base_url: str) -> List[Tuple[str, str]]:
     return links
 
 
-def _link_priority_score(link: str, anchor_text: str) -> int:
+def _link_priority_score(link: str, anchor_text: str, locale_bias: str = "us") -> int:
     haystack = f"{link.lower()} {anchor_text.lower()}"
-    return sum(1 for token in DIRECTORY_LINK_KEYWORDS if token in haystack)
+    score = sum(1 for token in DIRECTORY_LINK_KEYWORDS if token in haystack)
+    score += 1 if any(token in haystack for token in ["policy", "handbook", "people"]) else 0
+
+    # Down-rank obvious non-assessment pages and locale-mismatched paths.
+    score -= sum(2 for token in IRRELEVANT_URL_TOKENS if token in haystack)
+    if locale_bias.strip().lower() in {"us", "usa", "na"}:
+        score -= sum(2 for token in NON_US_LOCALE_TOKENS if token in haystack)
+    return score
 
 
-def _priority_directory_links(base_url: str, links: List[Tuple[str, str]], max_links: int = 25) -> List[str]:
+def _url_page_relevance_score(*, url: str, title: str | None, text: str) -> int:
+    lower_url = url.lower()
+    path = urlparse(url).path.lower()
+    title_lower = (title or "").lower()
+    preview = " ".join(text.lower().split())
+    if len(preview) > 3500:
+        preview = preview[:3500]
+
+    score = 0
+    path_hits = sum(1 for token in HR_URL_PATH_TOKENS if token in path)
+    score += min(5, path_hits * 2)
+    score += min(3, sum(1 for token in DIRECTORY_LINK_KEYWORDS if token in title_lower))
+    score += min(6, sum(1 for token in HR_CONTENT_TOKENS if token in preview))
+
+    if any(pattern.search(preview) for pattern in STAGE_SIGNAL_PATTERNS):
+        score += 3
+
+    irrelevant_hits = sum(1 for token in IRRELEVANT_URL_TOKENS if token in lower_url)
+    if irrelevant_hits:
+        score -= min(6, irrelevant_hits * 2)
+
+    if len(text.strip()) < 220:
+        score -= 1
+    return score
+
+
+def _is_hr_or_stage_relevant_page(page: "_FetchedPage") -> bool:
+    score = _url_page_relevance_score(url=page.final_url, title=page.title, text=page.text)
+    if score >= 2:
+        return True
+    # Keep explicitly supplied seed URLs even if sparse; caller may have included strategic pages.
+    if page.requested_url == page.final_url:
+        return True
+    return False
+
+
+def _priority_directory_links(
+    base_url: str,
+    links: List[Tuple[str, str]],
+    *,
+    max_links: int = 25,
+    locale_bias: str = "us",
+    max_urls_per_domain: int = 8,
+) -> List[str]:
     scored: List[Tuple[int, str]] = []
     seen = set()
     for link, anchor_text in links:
@@ -310,11 +468,24 @@ def _priority_directory_links(base_url: str, links: List[Tuple[str, str]], max_l
         seen.add(link)
         if not _same_domain(base_url, link):
             continue
-        score = _link_priority_score(link, anchor_text)
+        score = _link_priority_score(link, anchor_text, locale_bias=locale_bias)
         scored.append((score, link))
 
     scored.sort(key=lambda item: (-item[0], len(urlparse(item[1]).path), item[1]))
-    return [link for _, link in scored[:max_links]]
+    selected: List[str] = []
+    host_counts: Dict[str, int] = {}
+    for score, link in scored:
+        if score < 1:
+            continue
+        host = urlparse(link).netloc.lower().removeprefix("www.")
+        current = host_counts.get(host, 0)
+        if current >= max_urls_per_domain:
+            continue
+        host_counts[host] = current + 1
+        selected.append(link)
+        if len(selected) >= max_links:
+            break
+    return selected
 
 
 def _normalized_paragraph_hash(paragraph: str) -> str:
@@ -522,13 +693,21 @@ def _fetch_page(url: str, timeout_seconds: int = 15, light: bool = False) -> _Fe
     )
 
 
-def _fetch_url_set(url: str, timeout_seconds: int = 15, crawl_limit: int = 25) -> List[_FetchedPage]:
+def _fetch_url_set(
+    url: str,
+    timeout_seconds: int = 15,
+    crawl_limit: int = 25,
+    locale_bias: str = "us",
+    max_urls_per_domain: int = 8,
+) -> List[_FetchedPage]:
     return _fetch_url_set_with_limits(
         url=url,
         timeout_seconds=timeout_seconds,
         crawl_limit=crawl_limit,
         max_pages=None,
         child_workers=4,
+        locale_bias=locale_bias,
+        max_urls_per_domain=max_urls_per_domain,
     )
 
 
@@ -539,6 +718,8 @@ def _fetch_url_set_with_limits(
     crawl_limit: int,
     max_pages: int | None,
     child_workers: int,
+    locale_bias: str = "us",
+    max_urls_per_domain: int = 8,
 ) -> List[_FetchedPage]:
     root = _fetch_page(url, timeout_seconds=timeout_seconds, light=False)
     pages: List[_FetchedPage] = [root]
@@ -550,7 +731,13 @@ def _fetch_url_set_with_limits(
 
     visited = {root.final_url, root.requested_url}
 
-    child_urls = _priority_directory_links(root.final_url, root.links, max_links=crawl_limit)
+    child_urls = _priority_directory_links(
+        root.final_url,
+        root.links,
+        max_links=crawl_limit,
+        locale_bias=locale_bias,
+        max_urls_per_domain=max_urls_per_domain,
+    )
     logger.debug(
         "directory_detected root=%s candidate_children=%s crawl_limit=%s",
         root.final_url,
@@ -593,7 +780,7 @@ def _fetch_url_set_with_limits(
     top_k = max(1, _env_int("HR_REPORT_URL_DIRECTORY_TOPK", 8))
     scored_previews = []
     for preview in preview_pages:
-        score = _link_priority_score(preview.final_url, preview.text[:200])
+        score = _link_priority_score(preview.final_url, preview.text[:200], locale_bias=locale_bias)
         score += sum(1 for token in DIRECTORY_LINK_KEYWORDS if token in preview.text.lower())
         scored_previews.append((score, preview))
     scored_previews.sort(key=lambda item: item[0], reverse=True)
@@ -680,20 +867,25 @@ def load_documents(
     input_path: str | Path | None = None,
     pasted_text: str | None = None,
     urls: Sequence[str] | None = None,
+    max_urls_per_domain: int | None = None,
+    max_total_urls: int | None = None,
+    locale_bias: str | None = None,
 ) -> List[RawDocument]:
     docs: List[RawDocument] = []
     counter = 1
     url_timeout_seconds = max(1, _env_int("HR_REPORT_URL_TIMEOUT_SECONDS", 8))
-    crawl_limit = max(0, _env_int("HR_REPORT_URL_CRAWL_LIMIT", 25))
+    crawl_limit = max(0, max_urls_per_domain or _env_int("HR_REPORT_URL_CRAWL_LIMIT", 25))
     crawl_max_seed_urls = max(0, _env_int("HR_REPORT_URL_CRAWL_MAX_SEED_URLS", 8))
-    url_max_total_fetches = max(1, _env_int("HR_REPORT_URL_MAX_TOTAL_FETCHES", 120))
+    url_max_total_fetches = max(1, max_total_urls or _env_int("HR_REPORT_URL_MAX_TOTAL_FETCHES", 120))
     url_child_workers = max(1, _env_int("HR_REPORT_URL_CHILD_WORKERS", 6))
+    locale = (locale_bias or os.getenv("HR_REPORT_URL_LOCALE_BIAS", "us")).strip().lower() or "us"
 
     stats = {
         "urls_seeded": 0,
         "urls_fetched": 0,
         "url_fetch_failures": 0,
         "url_redirects": 0,
+        "url_pages_filtered_low_relevance": 0,
         "crawl_enabled": False,
         "crawl_depth": 1,
         "directory_crawl_ran": False,
@@ -769,6 +961,8 @@ def load_documents(
                 crawl_limit=effective_crawl_limit,
                 max_pages=remaining_fetch_budget,
                 child_workers=url_child_workers,
+                locale_bias=locale,
+                max_urls_per_domain=max(1, crawl_limit),
             )
             fetched_pages.extend(pages)
             stats["urls_fetched"] = int(stats["urls_fetched"]) + len(pages)
@@ -792,6 +986,10 @@ def load_documents(
     domains = set()
     for page in fetched_pages:
         if not page.text.strip():
+            continue
+        if not _is_hr_or_stage_relevant_page(page):
+            stats["url_pages_filtered_low_relevance"] = int(stats["url_pages_filtered_low_relevance"]) + 1
+            logger.debug("url_page_skipped_low_relevance url=%s title=%s", page.final_url, page.title or "")
             continue
         if page.final_url in seen_sources:
             continue

@@ -1,34 +1,29 @@
-# HR Growth-Areas Assessment Tool
+# HRReporter
 
-Web-first HR assessment app for solo consultants.
+Scale-aware HR assessment app for consultants. Submit pasted text, URLs, and files; get evidence-grounded rubric findings, stage/size guidance, and an HR assessment report aligned to template structure.
 
-## What Changed
-- Input requests are now designed to run through a web server on a port.
-- Works in both environments:
-  - local (`127.0.0.1:<port>`)
-  - AWS/Lightsail (`0.0.0.0:<port>` behind your public IP)
-- Request inputs are persisted in one folder: `data/input_requests/`.
-- Tuning/setup assets are centralized in `tuning/`.
+## What Changed (Startup Guidance + Report Alignment)
+- Runtime is now **profile-first** using one tuning file: `tuning/profile.yaml`.
+- Deprecated pack-era runtime paths were pruned; the main pipeline is profile-first only.
+- Snapshot extraction is now **evidence-first** (not full corpus prompting).
+- URL crawl prioritization is stricter to reduce irrelevant/niche pages.
+- Stage inference now supports both **company size bands** and **funding stage signals**.
+- Profile guidance supports stage-based HR structure recommendations, practices, and risks.
+- CSV checklist inputs are supported as first-class ingestion sources.
 
-## Repository Layout
-- `app/main.py`
-  CLI entrypoint (`run` and `serve`)
-- `app/pipeline.py`
-  Shared analysis pipeline used by CLI and web
-- `app/web/server.py`
-  FastAPI app + API endpoints
-- `app/web/static/`
-  UI (drag/drop/paste/url-drop)
-- `data/input_requests/`
-  Saved request inputs (files/text/urls/request metadata)
-- `tuning/packs/`
-  Consultant packs used for stage/check/rubric behavior
-- `tuning/setup/`
-  Prompting/tuning reference
-- `app/schemas/`
-  JSON schemas for snapshot/report/pack
-- `out/`
-  Generated outputs
+## Repo Layout
+- `app/main.py` CLI entry (`run`, `serve`)
+- `app/web/server.py` FastAPI server
+- `app/pipeline.py` shared pipeline
+- `app/logic/evidence_collector.py` unified retrieval/evidence pass
+- `app/logic/profile_evaluator.py` rubric findings lane
+- `app/logic/discovery.py` additional observations lane
+- `app/logic/stage_guidance.py` stage-based recommendation lane
+- `app/logic/scorecard.py` maturity/impact scorecard lane
+- `tuning/profile.yaml` primary tuning file
+- `app/schemas/profile_schema.json` profile schema
+- `data/input_requests/` saved web requests
+- `out/` generated outputs
 
 ## Setup
 ```bash
@@ -38,84 +33,80 @@ pip install --upgrade pip
 pip install -e '.[dev]'
 ```
 
-## Environment Variables
-The app auto-loads `.env`.
-
+## Environment
 - `OPENAI_API_KEY`
 - `OPENAI_MODEL`
 - `OPENAI_TIMEOUT_SECONDS`
-- `HR_REPORT_LOG_LEVEL` (default: `INFO`; set `DEBUG` for detailed crawl/retrieval/stage/check logs)
-- `HR_REPORT_SNAPSHOT_MAX_CHUNKS` (default: `80`, pre-filter cap before snapshot extraction)
-- `HR_REPORT_SNAPSHOT_MAX_PROMPT_CHARS` (default: `55000`, switches snapshot extraction to chunk-batched mode when prompt is too large)
-- `HR_REPORT_SNAPSHOT_CHUNK_BATCH_SIZE` (default: `24`, chunk count per snapshot batch when batching is enabled)
-- `HR_REPORT_URL_TIMEOUT_SECONDS` (default: `8`)
-- `HR_REPORT_URL_CRAWL_LIMIT` (default: `25` child links per detected directory page)
-- `HR_REPORT_URL_CRAWL_MAX_SEED_URLS` (default: `50`; disables directory crawling when you submit more seed URLs than this)
-- `HR_REPORT_URL_MAX_TOTAL_FETCHES` (default: `120` total URL fetches per request)
-- `HR_REPORT_URL_CHILD_WORKERS` (default: `6` for parallel child-page fetches)
-- `HR_REPORT_PACK` (default: `tuning/packs/default_pack.yaml`)
-- `HR_REPORT_INPUT_STORE` (default: `data/input_requests`)
+- `HR_REPORT_PROFILE` (default: `tuning/profile.yaml`)
 - `HR_REPORT_OUTPUT_DIR` (default: `out`)
-- `HR_REPORT_HOST` (default: `127.0.0.1`)
-- `HR_REPORT_PORT` (default: `8080`)
+- `HR_REPORT_INPUT_STORE` (default: `data/input_requests`)
+- Discovery synthesis controls:
+  - `HR_REPORT_DISCOVERY_MAX_PROMPT_CHARS` (default: `16000`, above this discovery switches to catalog-batch mode)
+  - `HR_REPORT_DISCOVERY_CATALOG_BATCH_SIZE` (default: `28`)
+- Snapshot evidence controls:
+  - `HR_REPORT_SNAPSHOT_EVIDENCE_MAX_PROMPT_CHARS` (default: `24000`, above this the extractor switches to field-batch mode)
+  - `HR_REPORT_SNAPSHOT_EVIDENCE_FIELD_BATCH_SIZE` (default: `12`)
+- Chunking controls:
+  - `HR_REPORT_CHUNK_MAX_CHARS` (default: `3200`)
+  - `HR_REPORT_CHUNK_OVERLAP_CHARS` (default: `320`)
+- URL controls:
+  - `HR_REPORT_URL_TIMEOUT_SECONDS`
+  - `HR_REPORT_URL_CRAWL_LIMIT`
+  - `HR_REPORT_URL_MAX_TOTAL_FETCHES`
+  - `HR_REPORT_URL_LOCALE_BIAS`
 
-## Run (Web, Recommended)
-### Local
+## Run Web App
 ```bash
 python -m app.main serve --host 127.0.0.1 --port 8080
 ```
 Open `http://127.0.0.1:8080`.
 
-### AWS/Lightsail
+## Run CLI
 ```bash
-python -m app.main serve --host 0.0.0.0 --port 8080
+python -m app.main run --profile tuning/profile.yaml --input inputs/company_pack/
 ```
-Open `http://<your-public-ip>:8080`.
 
-## UI Input Methods
-The web UI accepts all three:
-- pasted text
-- URLs (paste/drop)
-- uploaded files (drag-and-drop, browse, clipboard paste)
-
-Pack/model selection is fixed by `.env` (`HR_REPORT_PACK`, `OPENAI_MODEL`) and not editable in the UI.
-
-## API Endpoint
+## API
 `POST /api/analyze` (multipart form)
 - `text`
 - `urls`
 - `files[]`
 
-Returns:
-- `request_dir` (input persistence path)
+Response includes:
+- `request_dir`
 - `result.output_dir`
-- `result.report` + `result.report_markdown`
+- `result.report`
+- `result.report_markdown`
 
-## Optional CLI Mode
-```bash
-python -m app.main run --pack tuning/packs/default_pack.yaml --input inputs/company_pack/
-```
+Generated report sections include:
+- Executive Summary
+- Methodology and Data Sources
+- HR Functional Scorecard
+- Top Risks and Risk Flags
+- Stage-Based Recommendations
+- Functional Area Deep-Dives
 
-## Notes
-- Disclaimer remains fixed: `This is not legal advice; consider reviewing with counsel.`
-- If you changed packs previously under `packs/`, migrate to `tuning/packs/` for new defaults.
-- Snapshot extraction runs as one LLM call first and only splits recursively on context-limit errors.
-- Stage/scale inference uses explicit snapshot values first, then deterministic chunk signals (no separate headcount inference API step).
-- Each run now writes `run_meta.json` in the output folder with ingestion/chunk/retrieval/LLM stats.
+Export endpoints:
+- `POST /api/export/pdf` (JSON body: `markdown`, optional `filename`)
+- `POST /api/export/docx` (JSON body: `markdown`, optional `filename`)
 
-## Evidence Grounding Rules
-- Findings use `evidence_status`:
-  - `present`
-  - `explicitly_missing`
-  - `not_provided_in_sources`
-  - `not_assessed`
-- Retrieval classification is tracked per field:
-  - `MENTIONED_EXPLICIT`
-  - `MENTIONED_IMPLICIT`
-  - `MENTIONED_AMBIGUOUS`
-  - `NOT_FOUND_IN_RETRIEVED`
-  - `NOT_RETRIEVED`
-- `not_provided_in_sources` findings are confirmation-oriented and avoid “missing” language.
-- Threshold prompts (headcount/complexity triggers) remain high-priority but use conditional wording.
-- Top follow-up questions are deduplicated and capped.
-- Report appendix lists reviewed sources for defensibility.
+The web UI includes one-click buttons for:
+- `Download PDF`
+- `Download Word (.docx)`
+
+## Output Artifacts
+Each run still writes:
+- `report.json`
+- `report.md`
+- `snapshot.json`
+- `chunks_index.json`
+- `run_meta.json`
+
+## Evidence Semantics
+Findings keep explicit evidence semantics:
+- `present`
+- `explicitly_missing`
+- `not_provided_in_sources`
+- `not_assessed`
+
+Retrieval statuses remain explicit (`MENTIONED_EXPLICIT`, `MENTIONED_IMPLICIT`, etc.) for auditability.

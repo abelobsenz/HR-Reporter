@@ -430,18 +430,6 @@
           ],
           "default": null,
           "title": "Onboarding Program"
-        },
-        "role_plan_30_60_90": {
-          "anyOf": [
-            {
-              "type": "boolean"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Role Plan 30 60 90"
         }
       },
       "title": "Onboarding",

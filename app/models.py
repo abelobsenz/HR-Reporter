@@ -83,7 +83,6 @@ class Onboarding(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     onboarding_program: Optional[bool] = None
-    role_plan_30_60_90: Optional[bool] = None
 
 
 class ManagerEnablement(BaseModel):
@@ -194,7 +193,6 @@ class Finding(BaseModel):
     owner: str = "TBD / assign (e.g., HR/People, Finance, Ops)"
     metrics: List[MetricItem] = Field(default_factory=list)
     questions: List[str] = Field(default_factory=list)
-    score: Optional[float] = None
 
     @model_validator(mode="after")
     def validate_evidence_status(self) -> "Finding":
@@ -304,32 +302,60 @@ class RiskItem(BaseModel):
     legal_note: str = DISCLAIMER_TEXT
 
 
-class PlanAction(BaseModel):
+class GuidanceSource(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    action: str
-    rationale: str
-    evidence: List[Citation] = Field(default_factory=list)
+    id: str
+    title: str
+    url: str
+    published_date: Optional[str] = None
+    notes: Optional[str] = None
 
 
-class Plan3090(BaseModel):
+class GuidanceReference(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    why_now: str
-    days_30: List[PlanAction] = Field(default_factory=list)
-    days_60: List[PlanAction] = Field(default_factory=list)
-    days_90: List[PlanAction] = Field(default_factory=list)
+    title: str
+    url: str
+    published_date: Optional[str] = None
+
+
+class FunctionalScorecardItem(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    functional_area: str
+    maturity_level: Literal["Under-Developed", "Developing", "Aligned", "Strategic"]
+    impact_level: Literal["Limited", "Moderate", "Significant"]
+    rationale: Optional[str] = None
+
+
+class StageBasedRecommendation(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    size_stage: str
+    funding_stage: Optional[str] = None
+    hr_structure_recommendation: str
+    recommended_practices: List[str] = Field(default_factory=list)
+    potential_risks: List[str] = Field(default_factory=list)
+    sources: List[GuidanceReference] = Field(default_factory=list)
 
 
 class FinalReport(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     stage: str
-    confidence: float = Field(ge=0, le=1)
+    size_stage: Optional[str] = None
+    funding_stage: Optional[str] = None
+    company_stage: Optional[str] = None
     drivers: List[str] = Field(default_factory=list)
+    functional_scorecard: List[FunctionalScorecardItem] = Field(default_factory=list)
+    stage_based_recommendation: Optional[StageBasedRecommendation] = None
+    profile_expectations: List[Finding] = Field(default_factory=list)
+    additional_observations: List[Finding] = Field(default_factory=list)
     top_growth_areas: List[Finding] = Field(default_factory=list)
     risks: List[RiskItem] = Field(default_factory=list)
-    plan_30_60_90: Plan3090
+    methodology_summary: List[str] = Field(default_factory=list)
+    data_limitations: List[str] = Field(default_factory=list)
     follow_up_questions: List[str] = Field(default_factory=list)
     unknowns: List[str] = Field(default_factory=list)
     reviewed_sources: List[str] = Field(default_factory=list)
@@ -383,85 +409,180 @@ class StageBand(BaseModel):
     description: str
 
 
-class CheckDefinition(BaseModel):
+class SourceBundle(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    text: str = ""
+    urls: List[str] = Field(default_factory=list)
+    file_paths: List[str] = Field(default_factory=list)
+
+
+class AssessmentBundle(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    sources: SourceBundle
+    profile_id: str = "default"
+    company_context: Optional[str] = None
+
+
+class ProfileExpectation(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     id: str
     area: str
-    title: str
-    description: str
-    severity: Literal["low", "medium", "high", "critical"]
-    required_fields: List[str] = Field(default_factory=list)
-    actions: List[str] = Field(default_factory=list)
-    metrics: List[str] = Field(default_factory=list)
-    question_if_unknown: Optional[str] = None
-    followup_questions: List[str] = Field(default_factory=list)
-    retrieval_queries: List[str] = Field(default_factory=list)
-    evidence_requirements: Dict[str, Any] = Field(default_factory=dict)
-    evidence_scoring: Dict[str, Any] = Field(default_factory=dict)
-    coverage_expectations: Dict[str, Any] = Field(default_factory=dict)
-    question_group: Optional[str] = None
-    applies_to_stages: List[str] = Field(default_factory=list)
+    claim: str
+    severity_if_missing: Literal["low", "medium", "high", "critical"]
+    evidence_queries: List[str] = Field(default_factory=list)
+    snapshot_fields: List[str] = Field(default_factory=list)
+    follow_up_question: Optional[str] = None
     compliance: bool = False
 
 
-class WeightsConfig(BaseModel):
+class ProfileStage(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    area_weights: Dict[str, float]
-    severity_weights: Dict[str, float]
-    compliance_multiplier: float = Field(default=1.25, ge=1.0)
-    unknown_penalty: float = Field(default=0.1, ge=0, le=1)
+    id: str
+    label: str
+    min_headcount: int = Field(ge=0)
+    max_headcount: Optional[int] = Field(default=None, ge=0)
+    expectations: List[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_bounds(self) -> "ProfileStage":
+        if self.max_headcount is not None and self.max_headcount < self.min_headcount:
+            raise ValueError("max_headcount cannot be less than min_headcount")
+        return self
 
 
-class TemplatesConfig(BaseModel):
+class ProfileFundingStage(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    markdown_template: str
-    section_titles: Dict[str, str] = Field(default_factory=dict)
+    id: str
+    label: str
+    aliases: List[str] = Field(default_factory=list)
 
 
-class ConsultantPack(BaseModel):
+class StartupGuidanceRule(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str
+    size_stage_ids: List[str] = Field(default_factory=list)
+    funding_stage_ids: List[str] = Field(default_factory=list)
+    hr_structure_recommendation: str
+    recommended_practices: List[str] = Field(default_factory=list)
+    potential_risks: List[str] = Field(default_factory=list)
+    source_ids: List[str] = Field(default_factory=list)
+
+
+class RedFlagRule(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    id: str
+    area: str
+    severity: Literal["low", "medium", "high", "critical"] = "medium"
+    pattern: str
+    question: Optional[str] = None
+    regex: bool = False
+
+
+class RetrievalPolicy(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    max_urls_per_domain: int = Field(default=8, ge=1, le=30)
+    max_total_urls: int = Field(default=60, ge=1, le=250)
+    max_snippets_per_item: int = Field(default=6, ge=1, le=24)
+    snippet_max_chars: int = Field(default=900, ge=120, le=2400)
+    locale_bias: str = "us"
+
+
+class DiscoveryPolicy(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    enabled: bool = True
+    max_findings: int = Field(default=8, ge=1, le=30)
+
+
+class ConsultantProfile(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     version: str
     name: str
-    disclaimer: str = DISCLAIMER_TEXT
-    stages: List[StageBand]
-    weights: WeightsConfig
-    checks: List[CheckDefinition]
-    templates: TemplatesConfig
-    field_query_hints: Dict[str, Dict[str, Any]] = Field(default_factory=dict)
-    question_groups: Dict[str, Dict[str, Any]] = Field(default_factory=dict)
+    assessment_focus: Optional[str] = None
+    report_focus_points: List[str] = Field(default_factory=list)
+    ask_questions_when_unknown: bool = True
+    stages: List[ProfileStage]
+    funding_stages: List[ProfileFundingStage] = Field(default_factory=list)
+    startup_guidance_sources: List[GuidanceSource] = Field(default_factory=list)
+    startup_guidance_rules: List[StartupGuidanceRule] = Field(default_factory=list)
+    expectations: List[ProfileExpectation]
+    red_flags: List[RedFlagRule] = Field(default_factory=list)
+    retrieval_policy: RetrievalPolicy = Field(default_factory=RetrievalPolicy)
+    discovery: DiscoveryPolicy = Field(default_factory=DiscoveryPolicy)
     prompt_overrides: Dict[str, Any] = Field(default_factory=dict)
 
     @field_validator("stages")
     @classmethod
-    def validate_stages(cls, stages: List[StageBand]) -> List[StageBand]:
+    def validate_profile_stages(cls, stages: List[ProfileStage]) -> List[ProfileStage]:
         if not stages:
-            raise ValueError("At least one stage is required")
+            raise ValueError("At least one profile stage is required")
         seen = set()
         for stage in stages:
             if stage.id in seen:
-                raise ValueError(f"Duplicate stage id: {stage.id}")
+                raise ValueError(f"Duplicate profile stage id: {stage.id}")
             seen.add(stage.id)
-            if stage.max_headcount is not None and stage.max_headcount < stage.min_headcount:
-                raise ValueError(
-                    f"Stage {stage.id} has max_headcount smaller than min_headcount"
-                )
         return stages
 
-    @field_validator("checks")
+    @field_validator("expectations")
     @classmethod
-    def validate_checks(cls, checks: List[CheckDefinition]) -> List[CheckDefinition]:
-        if len(checks) < 1:
-            raise ValueError("At least one check is required")
+    def validate_expectations(cls, expectations: List[ProfileExpectation]) -> List[ProfileExpectation]:
+        if not expectations:
+            raise ValueError("At least one profile expectation is required")
         seen = set()
-        for check in checks:
-            if check.id in seen:
-                raise ValueError(f"Duplicate check id: {check.id}")
-            seen.add(check.id)
-        return checks
+        for expectation in expectations:
+            if expectation.id in seen:
+                raise ValueError(f"Duplicate profile expectation id: {expectation.id}")
+            seen.add(expectation.id)
+        return expectations
+
+    @field_validator("funding_stages")
+    @classmethod
+    def validate_funding_stages(cls, funding_stages: List[ProfileFundingStage]) -> List[ProfileFundingStage]:
+        seen = set()
+        for stage in funding_stages:
+            if stage.id in seen:
+                raise ValueError(f"Duplicate funding stage id: {stage.id}")
+            seen.add(stage.id)
+        return funding_stages
+
+    @model_validator(mode="after")
+    def validate_stage_expectation_links(self) -> "ConsultantProfile":
+        expectation_ids = {expectation.id for expectation in self.expectations}
+        for stage in self.stages:
+            for expectation_id in stage.expectations:
+                if expectation_id not in expectation_ids:
+                    raise ValueError(
+                        f"Stage '{stage.id}' references unknown expectation '{expectation_id}'"
+                    )
+        stage_ids = {stage.id for stage in self.stages}
+        funding_stage_ids = {stage.id for stage in self.funding_stages}
+        source_ids = {source.id for source in self.startup_guidance_sources}
+        for rule in self.startup_guidance_rules:
+            for stage_id in rule.size_stage_ids:
+                if stage_id not in stage_ids:
+                    raise ValueError(
+                        f"Startup guidance rule '{rule.id}' references unknown size stage '{stage_id}'"
+                    )
+            for stage_id in rule.funding_stage_ids:
+                if stage_id not in funding_stage_ids:
+                    raise ValueError(
+                        f"Startup guidance rule '{rule.id}' references unknown funding stage '{stage_id}'"
+                    )
+            for source_id in rule.source_ids:
+                if source_id not in source_ids:
+                    raise ValueError(
+                        f"Startup guidance rule '{rule.id}' references unknown source '{source_id}'"
+                    )
+        return self
 
 
 class StageInferenceResult(BaseModel):
@@ -475,6 +596,11 @@ class StageInferenceResult(BaseModel):
     stage_point_estimate: Optional[str] = None
     stage_confidence: Optional[float] = Field(default=None, ge=0, le=1)
     stage_evidence: List[Citation] = Field(default_factory=list)
+    funding_stage_id: Optional[str] = None
+    funding_stage_label: Optional[str] = None
+    funding_stage_confidence: Optional[float] = Field(default=None, ge=0, le=1)
+    funding_stage_evidence: List[Citation] = Field(default_factory=list)
+    company_stage_label: Optional[str] = None
     explicit_headcount_evidence: bool = False
     drivers: List[str] = Field(default_factory=list)
     signals: List[str] = Field(default_factory=list)

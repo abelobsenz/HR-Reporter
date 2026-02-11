@@ -1,0 +1,450 @@
+{
+  "$defs": {
+    "DiscoveryPolicy": {
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "default": true,
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "max_findings": {
+          "default": 8,
+          "maximum": 30,
+          "minimum": 1,
+          "title": "Max Findings",
+          "type": "integer"
+        }
+      },
+      "title": "DiscoveryPolicy",
+      "type": "object"
+    },
+    "GuidanceSource": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "title": {
+          "title": "Title",
+          "type": "string"
+        },
+        "url": {
+          "title": "Url",
+          "type": "string"
+        },
+        "published_date": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Published Date"
+        },
+        "notes": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Notes"
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "url"
+      ],
+      "title": "GuidanceSource",
+      "type": "object"
+    },
+    "ProfileExpectation": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "area": {
+          "title": "Area",
+          "type": "string"
+        },
+        "claim": {
+          "title": "Claim",
+          "type": "string"
+        },
+        "severity_if_missing": {
+          "enum": [
+            "low",
+            "medium",
+            "high",
+            "critical"
+          ],
+          "title": "Severity If Missing",
+          "type": "string"
+        },
+        "evidence_queries": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Queries",
+          "type": "array"
+        },
+        "snapshot_fields": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Snapshot Fields",
+          "type": "array"
+        },
+        "follow_up_question": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Follow Up Question"
+        },
+        "compliance": {
+          "default": false,
+          "title": "Compliance",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "area",
+        "claim",
+        "severity_if_missing"
+      ],
+      "title": "ProfileExpectation",
+      "type": "object"
+    },
+    "ProfileFundingStage": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "label": {
+          "title": "Label",
+          "type": "string"
+        },
+        "aliases": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Aliases",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "label"
+      ],
+      "title": "ProfileFundingStage",
+      "type": "object"
+    },
+    "ProfileStage": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "label": {
+          "title": "Label",
+          "type": "string"
+        },
+        "min_headcount": {
+          "minimum": 0,
+          "title": "Min Headcount",
+          "type": "integer"
+        },
+        "max_headcount": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max Headcount"
+        },
+        "expectations": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Expectations",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "label",
+        "min_headcount"
+      ],
+      "title": "ProfileStage",
+      "type": "object"
+    },
+    "RedFlagRule": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "area": {
+          "title": "Area",
+          "type": "string"
+        },
+        "severity": {
+          "default": "medium",
+          "enum": [
+            "low",
+            "medium",
+            "high",
+            "critical"
+          ],
+          "title": "Severity",
+          "type": "string"
+        },
+        "pattern": {
+          "title": "Pattern",
+          "type": "string"
+        },
+        "question": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Question"
+        },
+        "regex": {
+          "default": false,
+          "title": "Regex",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "area",
+        "pattern"
+      ],
+      "title": "RedFlagRule",
+      "type": "object"
+    },
+    "RetrievalPolicy": {
+      "additionalProperties": false,
+      "properties": {
+        "max_urls_per_domain": {
+          "default": 8,
+          "maximum": 30,
+          "minimum": 1,
+          "title": "Max Urls Per Domain",
+          "type": "integer"
+        },
+        "max_total_urls": {
+          "default": 60,
+          "maximum": 250,
+          "minimum": 1,
+          "title": "Max Total Urls",
+          "type": "integer"
+        },
+        "max_snippets_per_item": {
+          "default": 6,
+          "maximum": 24,
+          "minimum": 1,
+          "title": "Max Snippets Per Item",
+          "type": "integer"
+        },
+        "snippet_max_chars": {
+          "default": 900,
+          "maximum": 2400,
+          "minimum": 120,
+          "title": "Snippet Max Chars",
+          "type": "integer"
+        },
+        "locale_bias": {
+          "default": "us",
+          "title": "Locale Bias",
+          "type": "string"
+        }
+      },
+      "title": "RetrievalPolicy",
+      "type": "object"
+    },
+    "StartupGuidanceRule": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "string"
+        },
+        "size_stage_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Size Stage Ids",
+          "type": "array"
+        },
+        "funding_stage_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Funding Stage Ids",
+          "type": "array"
+        },
+        "hr_structure_recommendation": {
+          "title": "Hr Structure Recommendation",
+          "type": "string"
+        },
+        "recommended_practices": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Recommended Practices",
+          "type": "array"
+        },
+        "potential_risks": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Potential Risks",
+          "type": "array"
+        },
+        "source_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Source Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "hr_structure_recommendation"
+      ],
+      "title": "StartupGuidanceRule",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "version": {
+      "title": "Version",
+      "type": "string"
+    },
+    "name": {
+      "title": "Name",
+      "type": "string"
+    },
+    "assessment_focus": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Assessment Focus"
+    },
+    "report_focus_points": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Report Focus Points",
+      "type": "array"
+    },
+    "ask_questions_when_unknown": {
+      "default": true,
+      "title": "Ask Questions When Unknown",
+      "type": "boolean"
+    },
+    "stages": {
+      "items": {
+        "$ref": "#/$defs/ProfileStage"
+      },
+      "title": "Stages",
+      "type": "array"
+    },
+    "funding_stages": {
+      "items": {
+        "$ref": "#/$defs/ProfileFundingStage"
+      },
+      "title": "Funding Stages",
+      "type": "array"
+    },
+    "startup_guidance_sources": {
+      "items": {
+        "$ref": "#/$defs/GuidanceSource"
+      },
+      "title": "Startup Guidance Sources",
+      "type": "array"
+    },
+    "startup_guidance_rules": {
+      "items": {
+        "$ref": "#/$defs/StartupGuidanceRule"
+      },
+      "title": "Startup Guidance Rules",
+      "type": "array"
+    },
+    "expectations": {
+      "items": {
+        "$ref": "#/$defs/ProfileExpectation"
+      },
+      "title": "Expectations",
+      "type": "array"
+    },
+    "red_flags": {
+      "items": {
+        "$ref": "#/$defs/RedFlagRule"
+      },
+      "title": "Red Flags",
+      "type": "array"
+    },
+    "retrieval_policy": {
+      "$ref": "#/$defs/RetrievalPolicy"
+    },
+    "discovery": {
+      "$ref": "#/$defs/DiscoveryPolicy"
+    },
+    "prompt_overrides": {
+      "additionalProperties": true,
+      "title": "Prompt Overrides",
+      "type": "object"
+    }
+  },
+  "required": [
+    "version",
+    "name",
+    "stages",
+    "expectations"
+  ],
+  "title": "ConsultantProfile",
+  "type": "object"
+}

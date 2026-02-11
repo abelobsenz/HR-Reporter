@@ -1,58 +1,39 @@
 from __future__ import annotations
 
-from typing import List, Tuple
+from typing import List
 import logging
 
-from app.models import ConsultantPack, Finding
+from app.models import Finding
 
 logger = logging.getLogger(__name__)
 
+SEVERITY_ORDER = {
+    "critical": 4,
+    "high": 3,
+    "medium": 2,
+    "low": 1,
+}
 
-def rank_findings_and_adjust_confidence(
-    *,
-    findings: List[Finding],
-    pack: ConsultantPack,
-    stage_confidence: float,
-    unknown_count: int,
-    tracked_field_count: int,
-) -> Tuple[List[Finding], float]:
-    check_map = {check.id: check for check in pack.checks}
+EVIDENCE_STATUS_ORDER = {
+    "explicitly_missing": 4,
+    "not_assessed": 3,
+    "not_provided_in_sources": 2,
+    "present": 1,
+}
 
-    scored: List[Finding] = []
-    for finding in findings:
-        area_weight = pack.weights.area_weights.get(finding.area, 1.0)
-        severity_weight = pack.weights.severity_weights.get(finding.severity, 1.0)
-        base_check_id = finding.check_id.split(":", 1)[0]
-        check = check_map.get(base_check_id)
-        compliance_multiplier = pack.weights.compliance_multiplier if (check and check.compliance) else 1.0
-        finding.score = round(area_weight * severity_weight * compliance_multiplier, 4)
-        scored.append(finding)
-
-    scored.sort(key=lambda f: (f.score or 0.0), reverse=True)
-    if logger.isEnabledFor(logging.DEBUG):
-        logger.debug(
-            "scoring_ranked findings=%s top=%s",
-            len(scored),
-            [(f.check_id, f.score, f.severity) for f in scored[:5]],
-        )
-
-    denominator = max(tracked_field_count, 1)
-    unknown_ratio = min(1.0, unknown_count / denominator)
-    confidence_penalty = unknown_ratio * pack.weights.unknown_penalty
-    confidence = max(0.05, min(1.0, stage_confidence - confidence_penalty))
-    logger.info(
-        "scoring_done findings=%s unknown_ratio=%.3f confidence=%.3f",
-        len(scored),
-        unknown_ratio,
-        confidence,
-    )
-    return scored, round(confidence, 3)
-
+RETRIEVAL_ORDER = {
+    "MENTIONED_EXPLICIT": 5,
+    "MENTIONED_IMPLICIT": 4,
+    "MENTIONED_AMBIGUOUS": 3,
+    "NOT_FOUND_IN_RETRIEVED": 2,
+    "NOT_RETRIEVED": 1,
+    None: 0,
+}
 
 def build_growth_drivers(initial_drivers: List[str], findings: List[Finding], top_n: int = 3) -> List[str]:
     drivers = list(initial_drivers)
     for finding in findings[:top_n]:
-        drivers.append(f"{finding.title} flagged as {finding.severity} priority.")
+        drivers.append(f"{finding.title} flagged as a {finding.severity} severity risk signal.")
 
     deduped = []
     seen = set()
@@ -63,3 +44,28 @@ def build_growth_drivers(initial_drivers: List[str], findings: List[Finding], to
         deduped.append(driver)
     logger.debug("drivers_built count=%s", len(deduped))
     return deduped
+
+
+def rank_findings(findings: List[Finding]) -> List[Finding]:
+    """Rank findings without numeric scoring.
+
+    Ordering is deterministic:
+    1) evidence status criticality (explicitly missing first),
+    2) severity,
+    3) retrieval explicitness,
+    4) citation count.
+    """
+
+    ranked = sorted(
+        findings,
+        key=lambda item: (
+            EVIDENCE_STATUS_ORDER.get(item.evidence_status, 0),
+            SEVERITY_ORDER.get(item.severity, 0),
+            RETRIEVAL_ORDER.get(item.retrieval_status, 0),
+            len(item.evidence),
+            item.title.lower(),
+        ),
+        reverse=True,
+    )
+    logger.info("finding_ranking_done findings=%s", len(ranked))
+    return ranked

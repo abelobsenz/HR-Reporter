@@ -5,15 +5,17 @@ import logging
 
 from jinja2 import Environment, FileSystemLoader
 
-from app.models import ConsultantPack, FinalReport
+from app.models import FinalReport
 
 logger = logging.getLogger(__name__)
 
-def render_markdown(report: FinalReport, pack: ConsultantPack, repo_root: str | Path | None = None) -> str:
+def render_markdown(
+    report: FinalReport,
+    profile_name: str = "Default Profile",
+    repo_root: str | Path | None = None,
+) -> str:
     root = Path(repo_root) if repo_root else Path(__file__).resolve().parents[2]
-    template_path = Path(pack.templates.markdown_template)
-    if not template_path.is_absolute():
-        template_path = root / template_path
+    template_path = root / "app" / "report" / "templates" / "report.md.j2"
 
     if not template_path.exists():
         raise FileNotFoundError(f"Template not found: {template_path}")
@@ -25,6 +27,9 @@ def render_markdown(report: FinalReport, pack: ConsultantPack, repo_root: str | 
         autoescape=False,
     )
     template = env.get_template(template_path.name)
-    rendered = template.render(report=report.model_dump(mode="python"), pack=pack.model_dump(mode="python"))
+    rendered = template.render(
+        report=report.model_dump(mode="python"),
+        profile_name=profile_name,
+    )
     logger.info("report_rendered template=%s chars=%s", template_path, len(rendered))
     return rendered

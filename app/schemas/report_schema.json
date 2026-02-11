@@ -206,18 +206,6 @@
           },
           "title": "Questions",
           "type": "array"
-        },
-        "score": {
-          "anyOf": [
-            {
-              "type": "number"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "default": null,
-          "title": "Score"
         }
       },
       "required": [
@@ -229,6 +217,84 @@
         "stage_reason"
       ],
       "title": "Finding",
+      "type": "object"
+    },
+    "FunctionalScorecardItem": {
+      "additionalProperties": false,
+      "properties": {
+        "functional_area": {
+          "title": "Functional Area",
+          "type": "string"
+        },
+        "maturity_level": {
+          "enum": [
+            "Under-Developed",
+            "Developing",
+            "Aligned",
+            "Strategic"
+          ],
+          "title": "Maturity Level",
+          "type": "string"
+        },
+        "impact_level": {
+          "enum": [
+            "Limited",
+            "Moderate",
+            "Significant"
+          ],
+          "title": "Impact Level",
+          "type": "string"
+        },
+        "rationale": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rationale"
+        }
+      },
+      "required": [
+        "functional_area",
+        "maturity_level",
+        "impact_level"
+      ],
+      "title": "FunctionalScorecardItem",
+      "type": "object"
+    },
+    "GuidanceReference": {
+      "additionalProperties": false,
+      "properties": {
+        "title": {
+          "title": "Title",
+          "type": "string"
+        },
+        "url": {
+          "title": "Url",
+          "type": "string"
+        },
+        "published_date": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Published Date"
+        }
+      },
+      "required": [
+        "title",
+        "url"
+      ],
+      "title": "GuidanceReference",
       "type": "object"
     },
     "MetricItem": {
@@ -271,67 +337,6 @@
         "status"
       ],
       "title": "MetricItem",
-      "type": "object"
-    },
-    "Plan3090": {
-      "additionalProperties": false,
-      "properties": {
-        "why_now": {
-          "title": "Why Now",
-          "type": "string"
-        },
-        "days_30": {
-          "items": {
-            "$ref": "#/$defs/PlanAction"
-          },
-          "title": "Days 30",
-          "type": "array"
-        },
-        "days_60": {
-          "items": {
-            "$ref": "#/$defs/PlanAction"
-          },
-          "title": "Days 60",
-          "type": "array"
-        },
-        "days_90": {
-          "items": {
-            "$ref": "#/$defs/PlanAction"
-          },
-          "title": "Days 90",
-          "type": "array"
-        }
-      },
-      "required": [
-        "why_now"
-      ],
-      "title": "Plan3090",
-      "type": "object"
-    },
-    "PlanAction": {
-      "additionalProperties": false,
-      "properties": {
-        "action": {
-          "title": "Action",
-          "type": "string"
-        },
-        "rationale": {
-          "title": "Rationale",
-          "type": "string"
-        },
-        "evidence": {
-          "items": {
-            "$ref": "#/$defs/Citation"
-          },
-          "title": "Evidence",
-          "type": "array"
-        }
-      },
-      "required": [
-        "action",
-        "rationale"
-      ],
-      "title": "PlanAction",
       "type": "object"
     },
     "RiskItem": {
@@ -381,6 +386,58 @@
         "statement"
       ],
       "title": "RiskItem",
+      "type": "object"
+    },
+    "StageBasedRecommendation": {
+      "additionalProperties": false,
+      "properties": {
+        "size_stage": {
+          "title": "Size Stage",
+          "type": "string"
+        },
+        "funding_stage": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Funding Stage"
+        },
+        "hr_structure_recommendation": {
+          "title": "Hr Structure Recommendation",
+          "type": "string"
+        },
+        "recommended_practices": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Recommended Practices",
+          "type": "array"
+        },
+        "potential_risks": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Potential Risks",
+          "type": "array"
+        },
+        "sources": {
+          "items": {
+            "$ref": "#/$defs/GuidanceReference"
+          },
+          "title": "Sources",
+          "type": "array"
+        }
+      },
+      "required": [
+        "size_stage",
+        "hr_structure_recommendation"
+      ],
+      "title": "StageBasedRecommendation",
       "type": "object"
     },
     "Subcheck": {
@@ -453,17 +510,79 @@
       "title": "Stage",
       "type": "string"
     },
-    "confidence": {
-      "maximum": 1,
-      "minimum": 0,
-      "title": "Confidence",
-      "type": "number"
+    "size_stage": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Size Stage"
+    },
+    "funding_stage": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Funding Stage"
+    },
+    "company_stage": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Company Stage"
     },
     "drivers": {
       "items": {
         "type": "string"
       },
       "title": "Drivers",
+      "type": "array"
+    },
+    "functional_scorecard": {
+      "items": {
+        "$ref": "#/$defs/FunctionalScorecardItem"
+      },
+      "title": "Functional Scorecard",
+      "type": "array"
+    },
+    "stage_based_recommendation": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/StageBasedRecommendation"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "profile_expectations": {
+      "items": {
+        "$ref": "#/$defs/Finding"
+      },
+      "title": "Profile Expectations",
+      "type": "array"
+    },
+    "additional_observations": {
+      "items": {
+        "$ref": "#/$defs/Finding"
+      },
+      "title": "Additional Observations",
       "type": "array"
     },
     "top_growth_areas": {
@@ -480,8 +599,19 @@
       "title": "Risks",
       "type": "array"
     },
-    "plan_30_60_90": {
-      "$ref": "#/$defs/Plan3090"
+    "methodology_summary": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Methodology Summary",
+      "type": "array"
+    },
+    "data_limitations": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Data Limitations",
+      "type": "array"
     },
     "follow_up_questions": {
       "items": {
@@ -545,9 +675,7 @@
     }
   },
   "required": [
-    "stage",
-    "confidence",
-    "plan_30_60_90"
+    "stage"
   ],
   "title": "FinalReport",
   "type": "object"

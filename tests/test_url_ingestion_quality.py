@@ -165,3 +165,57 @@ def test_directory_crawl_respects_total_fetch_budget(monkeypatch) -> None:
 
     _ = load_documents(urls=[root])
     assert len(called_urls) <= 3
+
+
+def test_directory_crawl_skips_non_hr_child_links(monkeypatch) -> None:
+    root = "https://example.com/root"
+    child_people = "https://example.com/handbook/people-policies/"
+    child_sales = "https://example.com/sales/"
+    child_pricing = "https://example.com/pricing/"
+    html_by_url = {
+        root: """
+            <html><body>
+              <nav>
+                <a href="/handbook/people-policies/">People Policies</a>
+                <a href="/sales/">Sales</a>
+                <a href="/pricing/">Pricing</a>
+              </nav>
+              <main><p>Directory root.</p></main>
+            </body></html>
+        """,
+        child_people: """
+            <html><body><main><article>
+            <h1>People Policies</h1>
+            <p>The employee handbook and leave policy are maintained and reviewed quarterly.</p>
+            <p>Managers receive training on required anti-harassment and escalation workflows.</p>
+            </article></main></body></html>
+        """,
+        child_sales: """
+            <html><body><main><article>
+            <h1>Sales</h1><p>Contact sales for product packages and revenue plans.</p>
+            </article></main></body></html>
+        """,
+        child_pricing: """
+            <html><body><main><article>
+            <h1>Pricing</h1><p>Choose your plan and compare features.</p>
+            </article></main></body></html>
+        """,
+    }
+    called_urls: list[str] = []
+
+    def _fake_get(url: str, timeout: int = 15, allow_redirects: bool = True):  # noqa: ARG001
+        called_urls.append(url)
+        if url not in html_by_url:
+            raise RuntimeError(f"URL not mocked: {url}")
+        return _FakeResponse(url=url, text=html_by_url[url])
+
+    monkeypatch.setattr("requests.get", _fake_get)
+    monkeypatch.setenv("HR_REPORT_URL_CRAWL_MAX_SEED_URLS", "10")
+    monkeypatch.setenv("HR_REPORT_URL_CRAWL_LIMIT", "10")
+    monkeypatch.setenv("HR_REPORT_URL_MAX_TOTAL_FETCHES", "10")
+
+    docs = load_documents(urls=[root])
+    sources = {doc.source for doc in docs}
+    assert child_people in sources
+    assert child_sales not in sources
+    assert child_pricing not in sources
