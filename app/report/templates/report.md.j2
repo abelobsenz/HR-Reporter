@@ -128,7 +128,7 @@ No explicit high-risk findings were confirmed in reviewed evidence.
 {% if report.stage_based_recommendation.sources %}
 ### Guidance Sources
 {% for source in report.stage_based_recommendation.sources %}
-- {{ source.title }}{% if source.published_date %} ({{ source.published_date }}){% endif %}: {{ source.url }}
+- {{ source.title }}{% if source.published_date %} ({{ source.published_date }}){% endif %}{% if source.url and (source.url.startswith('http://') or source.url.startswith('https://')) %}: {{ source.url }}{% else %} (internal){% endif %}
 {% endfor %}
 {% endif %}
 {% else %}

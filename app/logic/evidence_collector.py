@@ -87,6 +87,14 @@ QUERY_NOISE_TOKENS = {
     "regularly",
     "rules",
     "standard",
+    "systems",
+    "system",
+    "reporting",
+    "reports",
+    "report",
+    "channel",
+    "channels",
+    "clear",
     "tracked",
     "training",
     "use",
@@ -118,6 +126,71 @@ RETRIEVAL_NOISE_TOKENS = QUERY_NOISE_TOKENS | {
 }
 LOW_CONTEXT_PREFIXES = {"and", "or", "but", "to", "with", "without"}
 
+HEADCOUNT_CONTEXT_TERMS = {
+    "headcount",
+    "employees",
+    "employee",
+    "people",
+    "team members",
+    "workforce",
+    "staff",
+    "fte",
+}
+HEADCOUNT_INEXACT_RE = re.compile(
+    r"\b(about|around|approximately|approx\.?|~|over|under|nearly|almost|more than|less than|at least|at most)\b",
+    flags=re.IGNORECASE,
+)
+HEADCOUNT_RANGE_RE = re.compile(
+    r"\b(\d{1,5})\s*(?:-|–|to)\s*(\d{1,5})\s*(employees|employee|people|team members|fte)?\b",
+    flags=re.IGNORECASE,
+)
+HEADCOUNT_PLUS_RE = re.compile(
+    r"\b(\d{1,5})\s*\+\s*(employees|employee|people|team members|fte)?\b",
+    flags=re.IGNORECASE,
+)
+HEADCOUNT_EXACT_RE = re.compile(
+    r"\b(\d{1,5})\s*(employees|employee|people|team members|fte)\b",
+    flags=re.IGNORECASE,
+)
+
+HR_POLICY_PROCESS_PATTERNS = [
+    r"\bpolicy\b",
+    r"\bprocess\b",
+    r"\bprocedure\b",
+    r"\btraining\b",
+    r"\bhandbook\b",
+    r"\bcomplaint\b",
+    r"\breporting\b",
+    r"\bhotline\b",
+    r"\binvestigation\b",
+    r"\bescalation\b",
+]
+
+EXPECTATION_DOMAIN_ANCHOR_PATTERNS: Dict[str, List[str]] = {
+    "anti_harassment_policy": [
+        r"\banti[- ]?harassment\b",
+        r"\bharassment\b",
+        r"\bretaliation\b",
+        r"\bcomplaint\b",
+        r"\bhotline\b",
+    ],
+    "i9_recordkeeping_controls": [
+        r"\bi[- ]?9\b",
+        r"\bemployment eligibility\b",
+        r"\be[- ]?verify\b",
+        r"\bwork authorization\b",
+        r"\brecordkeeping\b",
+    ],
+    "hris_system": [
+        r"\bhris\b",
+        r"\bworkday\b",
+        r"\bbamboohr\b",
+        r"\brippling\b",
+        r"\badp\b",
+        r"\bukg\b",
+    ],
+}
+
 
 @dataclass
 class _QueryItem:
@@ -128,6 +201,109 @@ class _QueryItem:
 
 def _tokenize(text: str) -> List[str]:
     return re.findall(r"[a-z0-9]+", text.lower())
+
+
+def _phrase_pattern(tokens: List[str]) -> re.Pattern[str] | None:
+    if not tokens:
+        return None
+    joined = r"(?:[\W_]+)".join(re.escape(token) for token in tokens)
+    return re.compile(rf"\b{joined}\b", flags=re.IGNORECASE)
+
+
+def _core_query_tokens(query: str) -> List[str]:
+    return [
+        token
+        for token in _tokenize(query)
+        if len(token) >= 3 and token not in QUERY_NOISE_TOKENS
+    ]
+
+
+def _query_windows(text: str) -> List[str]:
+    windows = _split_paragraphs(text) + _split_sentences(text)
+    out: List[str] = []
+    seen = set()
+    for window in windows:
+        cleaned = " ".join(window.split()).strip()
+        if not cleaned:
+            continue
+        key = cleaned.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(cleaned)
+    if not out:
+        fallback = " ".join(text.split()).strip()
+        if fallback:
+            out.append(fallback)
+    return out
+
+
+def _query_match_detail(query: str, *, chunk_text: str, windows: List[str]) -> Dict[str, Any]:
+    query_tokens = _tokenize(query)
+    core_tokens = _core_query_tokens(query)
+    if not query_tokens:
+        return {
+            "qualified": False,
+            "phrase_level": False,
+            "matched_terms": [],
+            "matched_query": query,
+        }
+
+    full_phrase_pattern = _phrase_pattern(query_tokens)
+    phrase_level = bool(full_phrase_pattern and full_phrase_pattern.search(chunk_text))
+
+    subphrase_match = False
+    if not phrase_level and len(core_tokens) >= 2:
+        for span in range(min(3, len(core_tokens)), 1, -1):
+            for index in range(0, len(core_tokens) - span + 1):
+                subphrase_tokens = core_tokens[index : index + span]
+                subphrase_pattern = _phrase_pattern(subphrase_tokens)
+                if subphrase_pattern and subphrase_pattern.search(chunk_text):
+                    subphrase_match = True
+                    break
+            if subphrase_match:
+                break
+
+    two_core_tokens_in_window = False
+    if len(core_tokens) >= 2:
+        for window in windows:
+            lower = window.lower()
+            token_hits = sum(1 for token in set(core_tokens) if _term_matches_chunk(token, lower))
+            if token_hits >= 2:
+                two_core_tokens_in_window = True
+                break
+
+    phrase_level = phrase_level or subphrase_match
+    qualified = phrase_level or two_core_tokens_in_window
+    matched_terms = [
+        token for token in core_tokens if _term_matches_chunk(token, chunk_text)
+    ]
+    return {
+        "qualified": qualified,
+        "phrase_level": phrase_level,
+        "matched_terms": matched_terms,
+        "matched_query": query,
+    }
+
+
+def _domain_anchor_patterns(item_id: str, queries: Sequence[str]) -> List[str]:
+    from_map = EXPECTATION_DOMAIN_ANCHOR_PATTERNS.get(item_id, [])
+    if from_map:
+        return list(from_map)
+
+    patterns: List[str] = []
+    for query in queries:
+        for token in _core_query_tokens(query):
+            if token in {"planning", "hiring", "staffing", "review", "cycle"}:
+                continue
+            if len(token) < 4:
+                continue
+            pattern = rf"\b{re.escape(token)}\b"
+            if pattern not in patterns:
+                patterns.append(pattern)
+            if len(patterns) >= 6:
+                return patterns
+    return patterns
 
 
 def _term_matches_chunk(term: str, chunk_lower: str) -> bool:
@@ -336,6 +512,11 @@ class EvidenceCollector:
             expectation_evidence,
             expectation_statuses,
         )
+        self._inject_headcount_field_evidence(
+            field_evidence=field_evidence,
+            field_statuses=field_statuses,
+            field_queries=field_queries,
+        )
 
         coverage_summary = {
             "retrieved_docs": len(self.documents),
@@ -390,12 +571,7 @@ class EvidenceCollector:
         self,
         item: _QueryItem,
     ) -> tuple[List[Dict[str, Any]], str]:
-        query_terms = [
-            token
-            for token in _tokenize(" ".join(item.queries))
-            if len(token) >= 3 and token not in RETRIEVAL_NOISE_TOKENS
-        ]
-        query_terms = list(dict.fromkeys(query_terms))
+        anchor_patterns = _domain_anchor_patterns(item.item_id, item.queries)
 
         candidates: List[Dict[str, Any]] = []
         max_snippets = self.profile.retrieval_policy.max_snippets_per_item
@@ -410,10 +586,31 @@ class EvidenceCollector:
                 continue
             searchable_chunks += 1
 
-            matched_terms = [term for term in query_terms if _term_matches_chunk(term, lower)]
+            windows = _query_windows(chunk.text)
+            query_matches = [
+                _query_match_detail(query, chunk_text=lower, windows=windows)
+                for query in item.queries
+            ]
+            qualifying = [entry for entry in query_matches if entry["qualified"]]
+            if not qualifying:
+                continue
+
+            matched_terms = list(
+                dict.fromkeys(
+                    [
+                        str(term)
+                        for entry in qualifying
+                        for term in entry.get("matched_terms", [])
+                        if str(term)
+                    ]
+                )
+            )
             hr_hits, legal_hits = _chunk_signal_profile(lower)
             if not matched_terms:
                 continue
+            phrase_level_matches = sum(1 for entry in qualifying if entry["phrase_level"])
+            policy_process_hits = _match_count(HR_POLICY_PROCESS_PATTERNS, lower)
+            anchor_hits = sum(1 for pattern in anchor_patterns if re.search(pattern, lower))
 
             doc = self._doc_by_id.get(chunk.doc_id)
             snippet = self._best_snippet(
@@ -429,7 +626,15 @@ class EvidenceCollector:
             kind = self._evidence_kind(snippet, matched_terms)
             nav_penalty = max(0.0, chunk.nav_score or 0.0)
             lexical = len(matched_terms)
-            score = (lexical * 2.1) + (0.25 * hr_hits) - (0.14 * legal_hits) - (0.18 * nav_penalty)
+            score = (
+                (lexical * 2.1)
+                + (0.72 * phrase_level_matches)
+                + (0.25 * hr_hits)
+                - (0.14 * legal_hits)
+                - (0.18 * nav_penalty)
+            )
+            if policy_process_hits > 0 and anchor_hits > 0:
+                score += 1.35 + (0.22 * min(anchor_hits, 3))
 
             citation = Citation(
                 chunk_id=chunk.chunk_id,
@@ -566,6 +771,177 @@ class EvidenceCollector:
         if terms:
             return "implicit"
         return "ambiguous"
+
+    def _inject_headcount_field_evidence(
+        self,
+        *,
+        field_evidence: Dict[str, List[Dict[str, Any]]],
+        field_statuses: Dict[str, str],
+        field_queries: Dict[str, List[str]],
+    ) -> None:
+        max_snippets = self.profile.retrieval_policy.max_snippets_per_item
+        headcount_rows, range_rows = self._collect_headcount_rows()
+
+        def _ensure_queries(field_path: str, queries: List[str]) -> None:
+            existing = list(field_queries.get(field_path, []))
+            for query in queries:
+                if query not in existing:
+                    existing.append(query)
+            field_queries[field_path] = existing
+
+        if headcount_rows:
+            field_evidence["headcount"] = headcount_rows[:max_snippets]
+            field_statuses["headcount"] = _merge_status(
+                field_statuses.get("headcount"),
+                "MENTIONED_EXPLICIT",
+            ) or "MENTIONED_EXPLICIT"
+        elif "headcount" not in field_statuses:
+            field_statuses["headcount"] = "NOT_FOUND_IN_RETRIEVED" if self.chunks else "NOT_RETRIEVED"
+
+        if range_rows:
+            field_evidence["headcount_range"] = range_rows[:max_snippets]
+            field_statuses["headcount_range"] = _merge_status(
+                field_statuses.get("headcount_range"),
+                "MENTIONED_EXPLICIT",
+            ) or "MENTIONED_EXPLICIT"
+        elif "headcount_range" not in field_statuses:
+            field_statuses["headcount_range"] = "NOT_FOUND_IN_RETRIEVED" if self.chunks else "NOT_RETRIEVED"
+
+        _ensure_queries(
+            "headcount",
+            ["headcount", "employees", "team size", "people employed"],
+        )
+        _ensure_queries(
+            "headcount_range",
+            ["headcount range", "employees range", "about X-Y people", "X+ employees"],
+        )
+
+    def _collect_headcount_rows(self) -> tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+        if not self.chunks:
+            return [], []
+
+        exact_candidates: List[Dict[str, Any]] = []
+        range_candidates: List[Dict[str, Any]] = []
+        max_chars = self.profile.retrieval_policy.snippet_max_chars
+
+        for chunk in self.chunks:
+            doc = self._doc_by_id.get(chunk.doc_id)
+            sentences = _split_sentences(chunk.text)
+            if not sentences:
+                sentences = [" ".join(chunk.text.split()).strip()]
+
+            for sentence in sentences:
+                snippet = _clip_text(sentence, max_chars)
+                lower = snippet.lower()
+                if len(snippet) < 30:
+                    continue
+                if not any(term in lower for term in HEADCOUNT_CONTEXT_TERMS):
+                    continue
+
+                range_match = HEADCOUNT_RANGE_RE.search(lower)
+                plus_match = HEADCOUNT_PLUS_RE.search(lower)
+                inexact = bool(HEADCOUNT_INEXACT_RE.search(lower))
+
+                if range_match:
+                    lo = int(range_match.group(1))
+                    hi = int(range_match.group(2))
+                    normalized = f"{min(lo, hi)}-{max(lo, hi)}"
+                    score = 8.8 + (0.4 if inexact else 0.0)
+                    range_candidates.append(
+                        self._build_headcount_row(
+                            chunk=chunk,
+                            doc=doc,
+                            snippet=snippet,
+                            score=score,
+                            kind="explicit",
+                            normalized_value=normalized,
+                        )
+                    )
+                    continue
+
+                if plus_match:
+                    value = int(plus_match.group(1))
+                    normalized = f"{value}+"
+                    score = 8.2 + (0.3 if inexact else 0.0)
+                    range_candidates.append(
+                        self._build_headcount_row(
+                            chunk=chunk,
+                            doc=doc,
+                            snippet=snippet,
+                            score=score,
+                            kind="explicit",
+                            normalized_value=normalized,
+                        )
+                    )
+                    continue
+
+                exact_match = HEADCOUNT_EXACT_RE.search(lower)
+                if exact_match and not inexact:
+                    score = 8.4
+                    exact_candidates.append(
+                        self._build_headcount_row(
+                            chunk=chunk,
+                            doc=doc,
+                            snippet=snippet,
+                            score=score,
+                            kind="explicit",
+                        )
+                    )
+                    continue
+
+                if inexact:
+                    fallback_exact = HEADCOUNT_EXACT_RE.search(lower)
+                    if fallback_exact:
+                        value = int(fallback_exact.group(1))
+                        range_candidates.append(
+                            self._build_headcount_row(
+                                chunk=chunk,
+                                doc=doc,
+                                snippet=snippet,
+                                score=7.4,
+                                kind="ambiguous",
+                                normalized_value=f"{value}+",
+                            )
+                        )
+
+        return self._dedupe_rows(exact_candidates), self._dedupe_rows(range_candidates)
+
+    def _build_headcount_row(
+        self,
+        *,
+        chunk: TextChunk,
+        doc: RawDocument | None,
+        snippet: str,
+        score: float,
+        kind: str,
+        normalized_value: str | None = None,
+    ) -> Dict[str, Any]:
+        payload: Dict[str, Any] = {
+            "chunk_id": chunk.chunk_id,
+            "snippet": snippet,
+            "source_id": (doc.source_id if doc else None),
+            "doc_id": chunk.doc_id,
+            "start_char": chunk.start_char,
+            "end_char": chunk.end_char,
+            "evidence_recovered_by": "targeted_retrieval",
+            "retrieval_score": round(float(score), 4),
+            "source": (doc.source if doc else chunk.doc_id),
+            "kind": kind,
+        }
+        if normalized_value:
+            payload["normalized_value"] = normalized_value
+        return payload
+
+    def _dedupe_rows(self, rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        deduped: List[Dict[str, Any]] = []
+        seen = set()
+        for row in sorted(rows, key=lambda item: float(item.get("retrieval_score") or 0.0), reverse=True):
+            key = (str(row.get("chunk_id")), str(row.get("snippet")))
+            if key in seen:
+                continue
+            seen.add(key)
+            deduped.append(row)
+        return deduped
 
     def _aggregate_fields(
         self,

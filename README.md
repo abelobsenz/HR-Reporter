@@ -49,6 +49,7 @@ pip install -e '.[dev]'
 - Chunking controls:
   - `HR_REPORT_CHUNK_MAX_CHARS` (default: `3200`)
   - `HR_REPORT_CHUNK_OVERLAP_CHARS` (default: `320`)
+  - `HR_REPORT_CHUNK_MODE` (default: `legacy`; set `semantic` to enable heading-aware file chunking + tighter list/table chunks)
 - URL controls:
   - `HR_REPORT_URL_TIMEOUT_SECONDS`
   - `HR_REPORT_URL_CRAWL_LIMIT`

@@ -20,10 +20,13 @@ S5_PROXY_TERMS = [
     "global",
     "multi-country",
     "international",
-    "board",
     "investor relations",
     " ir ",
     "workday",
+]
+BOARD_PROXY_PATTERNS = [
+    re.compile(r"\bboard of directors\b", flags=re.IGNORECASE),
+    re.compile(r"\bboard meeting(?:s)?\b", flags=re.IGNORECASE),
 ]
 
 HEADCOUNT_CONTEXT_TERMS = {
@@ -39,12 +42,16 @@ HEADCOUNT_CONTEXT_TERMS = {
 
 HEADCOUNT_RANGE_RE = re.compile(r"\b(\d{1,5})\s*(?:-|to)\s*(\d{1,5})\b", flags=re.IGNORECASE)
 HEADCOUNT_PLUS_RE = re.compile(r"\b(\d{1,5})\s*\+")
+HEADCOUNT_INEXACT_RE = re.compile(
+    r"\b(about|around|approximately|approx\.?|~|over|under|nearly|almost|more than|less than|at least|at most)\b",
+    flags=re.IGNORECASE,
+)
 HEADCOUNT_EXPLICIT_RE = re.compile(
-    r"\bheadcount\s*(?:is|=|:|at)?\s*(?:about|around|approximately|~)?\s*(\d{2,5})\b",
+    r"\bheadcount\s*(?:is|=|:|at)?\s*(\d{2,5})\b",
     flags=re.IGNORECASE,
 )
 HEADCOUNT_EMPLOYEE_RE = re.compile(
-    r"\b(\d{2,5})\s*(employees|employee|fte|team members)\b",
+    r"\b(\d{2,5})\s*(employees|employee|fte|team members|people)\b",
     flags=re.IGNORECASE,
 )
 HEADCOUNT_RANGE_CONTEXT_RE = re.compile(
@@ -107,6 +114,39 @@ def _parse_headcount_range(value: str) -> Optional[Tuple[int, int | None]]:
     return None
 
 
+def _is_exact_headcount_snippet(snippet: str, *, expected_value: int | None = None) -> bool:
+    lower = snippet.lower()
+    if HEADCOUNT_RANGE_RE.search(lower) or HEADCOUNT_PLUS_RE.search(lower):
+        return False
+    if HEADCOUNT_INEXACT_RE.search(lower):
+        return False
+
+    value_match = HEADCOUNT_EXPLICIT_RE.search(lower) or HEADCOUNT_EMPLOYEE_RE.search(lower)
+    if not value_match:
+        return False
+    try:
+        value = int(value_match.group(1))
+    except (TypeError, ValueError):
+        return False
+    if expected_value is not None and value != expected_value:
+        return False
+    return True
+
+
+def _has_explicit_exact_headcount_evidence(snapshot: CompanyPeopleSnapshot) -> bool:
+    if snapshot.headcount is None:
+        return False
+    evidence = snapshot.evidence_map.get("headcount")
+    if evidence is None:
+        return False
+    if evidence.retrieval_status != "MENTIONED_EXPLICIT":
+        return False
+    return any(
+        _is_exact_headcount_snippet(citation.snippet, expected_value=snapshot.headcount)
+        for citation in evidence.citations
+    )
+
+
 def _signals_from_snapshot_and_chunks(snapshot: CompanyPeopleSnapshot, chunks: List[TextChunk] | None) -> List[str]:
     source_text = " ".join(
         [snapshot.company_name or ""]
@@ -119,6 +159,8 @@ def _signals_from_snapshot_and_chunks(snapshot: CompanyPeopleSnapshot, chunks: L
     for term in S5_PROXY_TERMS:
         if term in source_text:
             signals.append(term)
+    if any(pattern.search(source_text) for pattern in BOARD_PROXY_PATTERNS):
+        signals.append("board_of_directors")
 
     locations = [loc.lower() for loc in snapshot.primary_locations]
     if len({loc.strip() for loc in locations if loc.strip()}) >= 2:
@@ -153,7 +195,7 @@ def _signals_imply_s5(signals: List[str], drivers: List[str]) -> bool:
             "global entities",
             "global",
             "multi-country",
-            "board",
+            "board_of_directors",
             "investor relations",
             "workday",
         ]
@@ -319,7 +361,7 @@ def _infer_from_chunks(
                     best_confidence = 0.74
                     best_drivers = [f"Headcount range extracted from source text: {lo}-{hi}."]
                     best_citations = [Citation(chunk_id=chunk.chunk_id, snippet=sentence)]
-                    explicit = True
+                    explicit = False
                 continue
 
             plus_match = HEADCOUNT_PLUS_CONTEXT_RE.search(lower) or HEADCOUNT_PLUS_RE.search(lower)
@@ -331,7 +373,20 @@ def _infer_from_chunks(
                     best_confidence = 0.7
                     best_drivers = [f"Headcount lower-bound extracted from source text: {lo}+"]
                     best_citations = [Citation(chunk_id=chunk.chunk_id, snippet=sentence)]
-                    explicit = True
+                    explicit = False
+                continue
+
+            if HEADCOUNT_INEXACT_RE.search(lower):
+                inexact_match = HEADCOUNT_EMPLOYEE_RE.search(lower) or HEADCOUNT_EXPLICIT_RE.search(lower)
+                if inexact_match:
+                    value = int(inexact_match.group(1))
+                    stage = _stage_for_headcount(value, stages)
+                    if stage and 0.7 > best_confidence:
+                        best_stage = stage
+                        best_confidence = 0.7
+                        best_drivers = [f"Inexact headcount signal extracted from source text: about {value}."]
+                        best_citations = [Citation(chunk_id=chunk.chunk_id, snippet=sentence)]
+                        explicit = False
                 continue
 
             explicit_match = HEADCOUNT_EXPLICIT_RE.search(lower)
@@ -383,16 +438,24 @@ def infer_stage(
     drivers: List[str] = []
     source = "unknown"
     explicit_headcount_evidence = False
+    has_numeric_headcount_signal = False
     stage_evidence = []
 
     if snapshot.headcount is not None:
         stage = _stage_for_headcount(snapshot.headcount, resolved_stages)
         if stage:
             selected = stage
-            confidence = 1.0
-            drivers = [f"Headcount explicitly stated as {snapshot.headcount}."]
+            has_numeric_headcount_signal = True
+            if _has_explicit_exact_headcount_evidence(snapshot):
+                confidence = 1.0
+                drivers = [f"Headcount explicitly stated as {snapshot.headcount}."]
+                explicit_headcount_evidence = True
+            else:
+                confidence = 0.72
+                drivers = [
+                    f"Headcount signal found ({snapshot.headcount}), but evidence is not explicitly exact."
+                ]
             source = "rules"
-            explicit_headcount_evidence = True
             candidates.append(_candidate(stage, confidence, drivers, signals))
 
     if selected is None and snapshot.headcount_range:
@@ -403,10 +466,10 @@ def infer_stage(
             stage = _stage_for_headcount(pivot, resolved_stages)
             if stage:
                 selected = stage
+                has_numeric_headcount_signal = True
                 confidence = 0.72
                 drivers = [f"Headcount range signal found: {snapshot.headcount_range}."]
                 source = "rules"
-                explicit_headcount_evidence = True
                 candidates.append(_candidate(stage, confidence, drivers, signals))
 
     if selected is None:
@@ -419,6 +482,7 @@ def infer_stage(
         ) = _infer_from_chunks(chunks=chunks, stages=resolved_stages)
         if chunk_stage is not None:
             selected = chunk_stage
+            has_numeric_headcount_signal = True
             confidence = chunk_confidence
             drivers = chunk_drivers
             source = "rules"
@@ -488,10 +552,15 @@ def infer_stage(
             funding_stage_confidence = 0.34
             funding_drivers = ["Funding stage estimated from company-size band (no explicit funding-round signal)."]
 
-    if not explicit_headcount_evidence:
+    if not has_numeric_headcount_signal:
         confidence = min(confidence, 0.68)
     if not funding_stage_evidence and funding_stage_confidence is not None:
         funding_stage_confidence = min(funding_stage_confidence, 0.45)
+    if funding_stage_confidence is not None:
+        if funding_stage_evidence:
+            confidence = round((confidence * 0.7) + (funding_stage_confidence * 0.3), 3)
+        else:
+            confidence = min(confidence, funding_stage_confidence)
 
     selected_index = next((idx for idx, stage in enumerate(stages_sorted) if stage.id == selected.id), None)
     if selected_index is not None:

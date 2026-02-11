@@ -52,3 +52,18 @@ def test_build_functional_scorecard_does_not_default_to_strategic_when_coverage_
     )
     assert rows
     assert rows[0].maturity_level in {"Developing", "Aligned"}
+
+
+def test_build_functional_scorecard_merges_performance_management_aliases() -> None:
+    findings = [
+        _finding("performance_mgmt", "high", "not_provided_in_sources"),
+        _finding("Performance Management", "medium", "not_provided_in_sources"),
+    ]
+
+    rows = build_functional_scorecard(findings=findings)
+    flagged_labels = [
+        row.functional_area
+        for row in rows
+        if row.rationale and "concern(s) were flagged" in row.rationale
+    ]
+    assert flagged_labels.count("Performance Management") == 1

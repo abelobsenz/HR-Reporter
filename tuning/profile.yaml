@@ -226,18 +226,18 @@ startup_guidance_sources:
 
   - id: hr_copilot_spec_v1
     title: "HR Copilot Specifications - v1"
-    url: "/Users/abelobsenz/Downloads/HR Copilot Specifications - v1.docx"
+    url: "internal://hr-copilot-spec-v1"
     published_date: "2026-02-10"
     notes: "Defines required deliverables, stage-based outputs, and evidence-traceable reporting requirements."
 
   - id: hr_assessment_report_template
     title: "HR Assessment Report - Template"
-    url: "/Users/abelobsenz/Downloads/HR Assessment Report - Template.docx"
+    url: "internal://hr-assessment-report-template"
     notes: "Target report structure, scoring language, and narrative style."
 
   - id: hr_functional_checklist_template
     title: "HR Assessment Checklist - Template - HR Functional Areas"
-    url: "/Users/abelobsenz/Downloads/HR Assessment Checklist - Template   - HR Functional Areas.csv"
+    url: "internal://hr-functional-checklist-template"
     notes: "Detailed control coverage across HR functional areas."
 
 startup_guidance_rules:
@@ -350,7 +350,7 @@ expectations:
       - "headcount planning"
       - "hiring plan"
       - "scenario planning"
-    snapshot_fields: ["headcount", "headcount_range"]
+    snapshot_fields: []
     follow_up_question: "Do you maintain base/stretch/downturn headcount scenarios?"
 
   - id: handbook_current

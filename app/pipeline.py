@@ -302,6 +302,7 @@ def run_assessment_pipeline(
     )
     chunk_max_chars = max(800, int(os.getenv("HR_REPORT_CHUNK_MAX_CHARS", "5200")))
     chunk_overlap_chars = max(80, int(os.getenv("HR_REPORT_CHUNK_OVERLAP_CHARS", "480")))
+    chunk_mode = (os.getenv("HR_REPORT_CHUNK_MODE", "legacy").strip().lower() or "legacy")
     _emit_progress(
         progress_callback,
         stage="chunk",
@@ -312,6 +313,7 @@ def run_assessment_pipeline(
         documents,
         max_chars=chunk_max_chars,
         overlap_chars=chunk_overlap_chars,
+        chunk_mode=chunk_mode,
     )
     ingestion_stats = get_last_ingestion_stats()
     chunk_stats = get_last_chunk_stats()

@@ -394,6 +394,8 @@ class TextChunk(BaseModel):
 
     chunk_id: str
     doc_id: str
+    doc_title: Optional[str] = None
+    source: Optional[str] = None
     section: str
     heading_path: List[str] = Field(default_factory=list)
     is_list: bool = False

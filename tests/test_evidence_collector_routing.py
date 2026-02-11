@@ -164,3 +164,111 @@ def test_snippet_selection_prefers_complete_sentence_from_document_context() -> 
     assert manager_rows
     top_snippet = str(manager_rows[0].get("snippet", "")).lower()
     assert "manager training is mandatory for all supervisors" in top_snippet
+
+
+def test_anti_harassment_does_not_route_dashboard_reporting_noise() -> None:
+    profile = load_consultant_profile(REPO_ROOT / "tuning" / "profile.yaml")
+    dashboard_doc = _doc(
+        "doc-dashboard",
+        (
+            "Dashboards cover reporting for support response times and device management trends. "
+            "Internal systems provide reporting and status views."
+        ),
+    )
+    policy_doc = _doc(
+        "doc-code-of-conduct",
+        (
+            "Our anti-harassment policy prohibits retaliation and includes complaint intake channels. "
+            "Managers receive annual harassment training."
+        ),
+    )
+    chunks = [
+        TextChunk(
+            chunk_id="doc-dashboard-c001",
+            doc_id="doc-dashboard",
+            section="Internal systems",
+            text=dashboard_doc.text,
+        ),
+        TextChunk(
+            chunk_id="doc-code-of-conduct-c001",
+            doc_id="doc-code-of-conduct",
+            section="Code of conduct",
+            text=policy_doc.text,
+        ),
+    ]
+
+    result = EvidenceCollector(
+        profile=profile,
+        chunks=chunks,
+        documents=[dashboard_doc, policy_doc],
+        client=None,
+    ).collect()
+
+    anti_rows = result["expectation_evidence"].get("anti_harassment_policy", [])
+    anti_ids = {row.get("chunk_id") for row in anti_rows}
+    assert "doc-code-of-conduct-c001" in anti_ids
+    assert "doc-dashboard-c001" not in anti_ids
+
+
+def test_headcount_fields_do_not_take_capacity_planning_noise() -> None:
+    profile = load_consultant_profile(REPO_ROOT / "tuning" / "profile.yaml")
+    ladders_doc = _doc(
+        "doc-job-ladders",
+        (
+            "Engineering ladders include planning expectations for manager of one behaviors. "
+            "Capacity planning and staffing discussions are part of quarterly role calibration."
+        ),
+    )
+    chunks = [
+        TextChunk(
+            chunk_id="doc-job-ladders-c001",
+            doc_id="doc-job-ladders",
+            section="Job ladders",
+            text=ladders_doc.text,
+        )
+    ]
+
+    result = EvidenceCollector(
+        profile=profile,
+        chunks=chunks,
+        documents=[ladders_doc],
+        client=None,
+    ).collect()
+
+    assert result["field_evidence"].get("headcount", []) == []
+    assert result["field_evidence"].get("headcount_range", []) == []
+    assert result["field_statuses"].get("headcount") in {"NOT_FOUND_IN_RETRIEVED", "NOT_RETRIEVED"}
+    assert result["field_statuses"].get("headcount_range") in {"NOT_FOUND_IN_RETRIEVED", "NOT_RETRIEVED"}
+
+
+def test_generic_reporting_token_only_match_is_excluded() -> None:
+    profile = load_consultant_profile(REPO_ROOT / "tuning" / "profile.yaml")
+    generic_doc = _doc(
+        "doc-generic-reporting",
+        (
+            "The system has reporting dashboards and clear reporting standards for operational metrics. "
+            "This page documents analytics uptime targets and service quality metrics only."
+        ),
+    )
+    chunks = [
+        TextChunk(
+            chunk_id="doc-generic-reporting-c001",
+            doc_id="doc-generic-reporting",
+            section="Systems",
+            text=generic_doc.text,
+        )
+    ]
+
+    result = EvidenceCollector(
+        profile=profile,
+        chunks=chunks,
+        documents=[generic_doc],
+        client=None,
+    ).collect()
+
+    anti_rows = result["expectation_evidence"].get("anti_harassment_policy", [])
+    assert anti_rows == []
+    assert result["expectation_statuses"].get("anti_harassment_policy") in {
+        "NOT_FOUND_IN_RETRIEVED",
+        "NOT_RETRIEVED",
+    }

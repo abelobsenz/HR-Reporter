@@ -148,6 +148,24 @@ def _slugify(value: str) -> str:
     return cleaned or "document"
 
 
+def _infer_file_title(path: Path, text: str) -> str:
+    if path.suffix.lower() in {".md", ".markdown"}:
+        for line in text.splitlines():
+            stripped = line.strip()
+            if not stripped:
+                continue
+            match = re.match(r"^\s*#\s+(.+?)\s*$", stripped)
+            if match:
+                title = " ".join(match.group(1).split()).strip()
+                if title:
+                    return title
+                break
+            # Stop scanning title candidates once body prose starts.
+            if len(stripped.split()) >= 4:
+                break
+    return path.stem.replace("_", " ").replace("-", " ").strip() or "Untitled"
+
+
 def _load_txt(path: Path) -> str:
     return normalize_text(path.read_text(encoding="utf-8", errors="ignore"))
 
@@ -863,6 +881,16 @@ def _discover_input_files(input_path: Path) -> List[Path]:
     return files
 
 
+def _relative_file_source(file_path: Path, input_root: Path | None) -> str:
+    resolved = file_path.resolve()
+    if input_root is not None:
+        try:
+            return resolved.relative_to(input_root.resolve()).as_posix()
+        except ValueError:
+            pass
+    return file_path.name
+
+
 def load_documents(
     input_path: str | Path | None = None,
     pasted_text: str | None = None,
@@ -898,22 +926,27 @@ def load_documents(
         len(parse_url_candidates(urls)),
     )
 
+    input_root: Path | None = None
     if input_path:
         base = Path(input_path)
+        input_root = base if base.is_dir() else base.parent
         for file_path in _discover_input_files(base):
             text = load_file_text(file_path)
             if not text.strip():
                 continue
             doc_id = f"doc-{counter:03d}-{_slugify(file_path.stem)}"
             counter += 1
+            relative_source = _relative_file_source(file_path, input_root)
             docs.append(
                 RawDocument(
                     doc_id=doc_id,
-                    source_id=f"file:{file_path.resolve()}",
-                    source=str(file_path),
+                    source_id=f"file:{relative_source}",
+                    source=relative_source,
                     source_type="file",
+                    title=_infer_file_title(file_path, text),
                     retrieved_at=datetime.now(timezone.utc).isoformat(),
                     content_hash=hashlib.sha1(text.encode("utf-8")).hexdigest(),
+                    metadata={"absolute_path": str(file_path.resolve())},
                     text=text,
                 )
             )
@@ -924,7 +957,7 @@ def load_documents(
             RawDocument(
                 doc_id=f"doc-{counter:03d}-pasted-text",
                 source_id="text:pasted",
-                source="--text",
+                source="Pasted input text",
                 source_type="text",
                 retrieved_at=datetime.now(timezone.utc).isoformat(),
                 content_hash=hashlib.sha1(normalize_text(pasted_text).encode("utf-8")).hexdigest(),

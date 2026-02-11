@@ -16,7 +16,7 @@ def test_stage_inference_uses_profile_stages() -> None:
     result = infer_stage(snapshot=snapshot, profile=profile)
     assert result.stage_id == "100-250"
     assert result.source == "rules"
-    assert result.confidence == 1.0
+    assert result.confidence < 1.0
 
 
 def test_stage_inference_includes_missing_signals_and_alternate_candidates_when_uncertain() -> None:

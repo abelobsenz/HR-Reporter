@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import os
 import re
 import logging
+from dataclasses import dataclass
 from typing import Any, Dict, List, Tuple
 
 from app.models import RawDocument, TextChunk
@@ -13,6 +15,10 @@ HEADING_PATTERNS = [
     re.compile(r"^\s*(\d+(?:\.\d+)*)\s+(.+)$"),
     re.compile(r"^\s*([A-Z][A-Z\s\-/]{3,80})\s*$"),
 ]
+MARKDOWN_HEADING_RE = re.compile(r"^\s{0,3}(#{1,6})\s+(.+?)\s*#*\s*$")
+NUMBERED_HEADING_RE = re.compile(r"^\s*(\d+(?:\.\d+)*)[.)]?\s+(.+?)\s*$")
+UPPER_HEADING_RE = re.compile(r"^\s*([A-Z][A-Z\s\-/]{3,80})\s*$")
+BULLET_LINE_RE = re.compile(r"^\s*([-*]|\d+[.)])\s+")
 SALIENT_KEYWORDS = [
     "harassment",
     "complaint",
@@ -35,36 +41,116 @@ SALIENT_KEYWORDS = [
 _CHUNK_STATS: Dict[str, object] = {}
 
 
-def _is_heading(line: str) -> str | None:
+@dataclass
+class _Section:
+    heading_path: List[str]
+    text: str
+    start_offset: int
+
+
+@dataclass
+class _Block:
+    mode: str
+    text: str
+
+
+def _parse_heading_line(line: str) -> tuple[int, str] | None:
     stripped = line.strip()
     if not stripped:
         return None
-    for pattern in HEADING_PATTERNS:
-        match = pattern.match(stripped)
-        if match:
-            return match.groups()[-1].strip()
-    if stripped.endswith(":") and len(stripped.split()) <= 12:
-        return stripped[:-1].strip()
+
+    markdown_match = MARKDOWN_HEADING_RE.match(stripped)
+    if markdown_match:
+        level = len(markdown_match.group(1))
+        label = " ".join(markdown_match.group(2).split()).strip()
+        if label:
+            return level, label
+
+    numbered_match = NUMBERED_HEADING_RE.match(stripped)
+    if numbered_match:
+        level = min(6, len(numbered_match.group(1).split(".")))
+        label = " ".join(numbered_match.group(2).split()).strip()
+        if label:
+            return max(1, level), label
+
+    upper_match = UPPER_HEADING_RE.match(stripped)
+    if upper_match:
+        label = " ".join(upper_match.group(1).split()).strip()
+        if label:
+            return 1, label.title()
+
     return None
 
 
-def _split_sections(text: str) -> List[Tuple[str, str]]:
-    lines = text.splitlines()
-    sections: List[Tuple[str, List[str]]] = [("General", [])]
+def _is_heading(line: str) -> str | None:
+    parsed = _parse_heading_line(line)
+    return parsed[1] if parsed else None
 
-    for line in lines:
-        heading = _is_heading(line)
-        if heading:
-            sections.append((heading, []))
+
+def _looks_structured_markdown(text: str) -> bool:
+    markdown_hits = 0
+    generic_hits = 0
+    for raw_line in text.splitlines():
+        parsed = _parse_heading_line(raw_line)
+        if not parsed:
             continue
-        sections[-1][1].append(line)
+        if MARKDOWN_HEADING_RE.match(raw_line.strip()):
+            markdown_hits += 1
+        else:
+            generic_hits += 1
+    if markdown_hits >= 1:
+        return True
+    return generic_hits >= 2
 
-    out: List[Tuple[str, str]] = []
-    for section, content_lines in sections:
-        section_text = "\n".join(content_lines).strip()
+
+def _split_sections(text: str) -> List[_Section]:
+    if not text.strip():
+        return []
+
+    sections: List[_Section] = []
+    heading_stack: List[tuple[int, str]] = []
+    current_lines: List[str] = []
+    current_start: int | None = None
+    current_path: List[str] = ["General"]
+
+    def _flush() -> None:
+        nonlocal current_lines, current_start, current_path
+        if not current_lines or current_start is None:
+            current_lines = []
+            current_start = None
+            return
+        section_text = "\n".join(current_lines).strip()
         if section_text:
-            out.append((section, section_text))
-    return out
+            path = current_path[:] if current_path else ["General"]
+            sections.append(_Section(heading_path=path, text=section_text, start_offset=current_start))
+        current_lines = []
+        current_start = None
+
+    offset = 0
+    for raw_line in text.splitlines(keepends=True):
+        line = raw_line.rstrip("\r\n")
+        line_start = offset
+        offset += len(raw_line)
+
+        heading = _parse_heading_line(line)
+        if heading is not None:
+            _flush()
+            level, label = heading
+            while heading_stack and heading_stack[-1][0] >= level:
+                heading_stack.pop()
+            heading_stack.append((level, label))
+            current_path = [item[1] for item in heading_stack] or ["General"]
+            current_start = line_start
+            current_lines = [line]
+            continue
+
+        if current_start is None:
+            current_start = line_start
+            current_path = [item[1] for item in heading_stack] if heading_stack else ["General"]
+        current_lines.append(line)
+
+    _flush()
+    return sections
 
 
 def _line_mode(line: str) -> str:
@@ -73,16 +159,16 @@ def _line_mode(line: str) -> str:
         return "blank"
     if _is_heading(stripped):
         return "heading"
-    if re.match(r"^([-*]|\d+[.)])\s+", stripped):
+    if BULLET_LINE_RE.match(stripped):
         return "list"
     if "|" in stripped and len(stripped) >= 6:
         return "table"
     return "text"
 
 
-def _split_blocks(text: str) -> List[str]:
+def _split_blocks(text: str) -> List[_Block]:
     lines = text.splitlines()
-    blocks: List[List[str]] = []
+    blocks: List[_Block] = []
     current: List[str] = []
     current_mode = "text"
 
@@ -92,7 +178,7 @@ def _split_blocks(text: str) -> List[str]:
             return
         block = "\n".join(current).strip()
         if block:
-            blocks.append(current[:])
+            blocks.append(_Block(mode=current_mode, text=block))
         current = []
 
     for line in lines:
@@ -105,32 +191,133 @@ def _split_blocks(text: str) -> List[str]:
             current = [line]
             current_mode = mode
             continue
-        # Keep coherent list/table runs intact, and let text paragraphs accumulate.
+        # Keep coherent runs intact.
         if current_mode == mode and mode in {"list", "table", "text"}:
             current.append(line)
             continue
-        # Headings should stand alone to avoid injecting formatting noise into neighboring blocks.
+        # Headings should stand alone.
         if mode == "heading" or current_mode == "heading":
             _flush()
             current = [line]
             current_mode = mode
-            continue
-        # Merge short list/text transitions that are likely the same paragraph context.
-        if {current_mode, mode} <= {"text", "list"} and len(" ".join(current).split()) < 28:
-            current.append(line)
-            current_mode = "text"
             continue
         _flush()
         current = [line]
         current_mode = mode
     _flush()
 
-    out: List[str] = []
-    for block_lines in blocks:
-        block = "\n".join(block_lines).strip()
-        if block:
-            out.append(block)
-    return out
+    return blocks
+
+
+def _split_list_entries(block: str) -> List[str]:
+    lines = [line for line in block.splitlines() if line.strip()]
+    if not lines:
+        return []
+    entries: List[List[str]] = []
+    current: List[str] = []
+    for line in lines:
+        if BULLET_LINE_RE.match(line) and current:
+            entries.append(current)
+            current = [line]
+            continue
+        current.append(line)
+    if current:
+        entries.append(current)
+    return ["\n".join(entry).strip() for entry in entries if any(part.strip() for part in entry)]
+
+
+def _split_long_list_block(
+    block: str,
+    *,
+    max_chars: int,
+    min_bullets: int = 6,
+    max_bullets: int = 12,
+) -> List[str]:
+    if len(block) <= max_chars:
+        return [block]
+    entries = _split_list_entries(block)
+    if len(entries) <= 1:
+        return _split_long_block(block, max_chars=max_chars, overlap_chars=0)
+
+    chunks: List[str] = []
+    current_entries: List[str] = []
+    current_len = 0
+
+    def _flush() -> None:
+        nonlocal current_entries, current_len
+        if not current_entries:
+            return
+        chunks.append("\n".join(current_entries).strip())
+        current_entries = []
+        current_len = 0
+
+    for idx, entry in enumerate(entries):
+        entry_len = len(entry) + (1 if current_entries else 0)
+        remaining = len(entries) - idx
+        should_flush_for_size = current_entries and (current_len + entry_len > max_chars)
+        should_flush_for_count = len(current_entries) >= max_bullets
+        if should_flush_for_count or (should_flush_for_size and len(current_entries) >= min_bullets):
+            _flush()
+        current_entries.append(entry)
+        current_len += entry_len
+        if len(current_entries) >= max_bullets and remaining > 0:
+            _flush()
+
+    _flush()
+
+    normalized: List[str] = []
+    for part in chunks:
+        if len(part) <= max_chars:
+            normalized.append(part)
+            continue
+        normalized.extend(_split_long_block(part, max_chars=max_chars, overlap_chars=0))
+    return normalized
+
+
+def _split_long_table_block(block: str, *, max_chars: int) -> List[str]:
+    if len(block) <= max_chars:
+        return [block]
+    lines = [line for line in block.splitlines() if line.strip()]
+    if len(lines) <= 2:
+        return _split_long_block(block, max_chars=max_chars, overlap_chars=0)
+
+    header = lines[:2] if len(lines) >= 2 and set(lines[1].replace("|", "").strip()) <= {"-", ":"} else lines[:1]
+    rows = lines[len(header) :]
+    chunks: List[str] = []
+    current_rows: List[str] = []
+    current_len = len("\n".join(header))
+
+    def _flush() -> None:
+        nonlocal current_rows, current_len
+        if not current_rows:
+            return
+        rows_block = "\n".join(current_rows)
+        chunks.append("\n".join(header + [rows_block]).strip())
+        current_rows = []
+        current_len = len("\n".join(header))
+
+    for row in rows:
+        row_len = len(row) + 1
+        if current_rows and current_len + row_len > max_chars:
+            _flush()
+        current_rows.append(row)
+        current_len += row_len
+    _flush()
+    return chunks or _split_long_block(block, max_chars=max_chars, overlap_chars=0)
+
+
+def _context_header_from_previous_block(previous: _Block | None) -> str | None:
+    if previous is None:
+        return None
+    lines = [line.strip() for line in previous.text.splitlines() if line.strip()]
+    if not lines:
+        return None
+    candidate = lines[-1]
+    if candidate.endswith(":"):
+        return candidate
+    if previous.mode == "heading":
+        return candidate
+    return None
 
 
 def _split_long_block(block: str, max_chars: int, overlap_chars: int) -> List[str]:
@@ -183,36 +370,61 @@ def _split_long_block(block: str, max_chars: int, overlap_chars: int) -> List[st
     return chunks
 
 
-def _chunk_text(text: str, max_chars: int = 3200, overlap_chars: int = 320) -> List[str]:
+def _chunk_text(
+    text: str,
+    max_chars: int = 3200,
+    overlap_chars: int = 320,
+    *,
+    list_table_max_chars: int | None = None,
+) -> List[str]:
     stripped_text = text.strip()
     if len(stripped_text) <= max_chars:
         return [stripped_text]
 
     blocks = _split_blocks(stripped_text)
     if not blocks:
-        blocks = [stripped_text]
+        blocks = [_Block(mode="text", text=stripped_text)]
 
     chunks: List[str] = []
     current = ""
     sep = "\n\n"
+    previous_block: _Block | None = None
 
     for block in blocks:
-        candidate = f"{current}{sep}{block}".strip() if current else block
-        if len(candidate) <= max_chars:
-            current = candidate
-            continue
+        block_limit = max_chars
+        if block.mode in {"list", "table"} and list_table_max_chars is not None:
+            block_limit = max(500, min(max_chars, list_table_max_chars))
 
-        if current:
-            chunks.append(current)
+        if block.mode == "list":
+            block_parts = _split_long_list_block(block.text, max_chars=block_limit)
+        elif block.mode == "table":
+            block_parts = _split_long_table_block(block.text, max_chars=block_limit)
+        else:
+            block_parts = _split_long_block(block.text, max_chars=block_limit, overlap_chars=overlap_chars)
 
-        if len(block) <= max_chars:
-            current = block
-            continue
+        context_header = _context_header_from_previous_block(previous_block) if block.mode in {"list", "table"} else None
 
-        for part in _split_long_block(block, max_chars=max_chars, overlap_chars=overlap_chars):
-            if len(part) <= max_chars:
-                chunks.append(part)
-        current = ""
+        for part in block_parts:
+            enriched_part = part
+            if context_header and context_header not in part:
+                enriched_part = f"{context_header}\n{part}".strip()
+
+            candidate = f"{current}{sep}{enriched_part}".strip() if current else enriched_part
+            if len(candidate) <= max_chars:
+                current = candidate
+                continue
+
+            if current:
+                chunks.append(current)
+            if len(enriched_part) <= max_chars:
+                current = enriched_part
+                continue
+
+            for extra in _split_long_block(enriched_part, max_chars=max_chars, overlap_chars=overlap_chars):
+                if len(extra) <= max_chars:
+                    chunks.append(extra)
+            current = ""
+        previous_block = block
 
     if current:
         chunks.append(current)
@@ -266,8 +478,14 @@ def _chunk_text_with_offsets(
     base_offset: int,
     max_chars: int = 3200,
     overlap_chars: int = 320,
+    list_table_max_chars: int | None = None,
 ) -> List[Tuple[str, int, int]]:
-    parts = _chunk_text(text, max_chars=max_chars, overlap_chars=overlap_chars)
+    parts = _chunk_text(
+        text,
+        max_chars=max_chars,
+        overlap_chars=overlap_chars,
+        list_table_max_chars=list_table_max_chars,
+    )
     out: List[Tuple[str, int, int]] = []
     cursor = 0
     for part in parts:
@@ -287,27 +505,42 @@ def chunk_documents(
     documents: List[RawDocument],
     max_chars: int = 3200,
     overlap_chars: int = 320,
+    chunk_mode: str | None = None,
 ) -> tuple[List[TextChunk], Dict[str, Dict[str, Any]]]:
     chunks: List[TextChunk] = []
     index: Dict[str, Dict[str, Any]] = {}
+    resolved_mode = (chunk_mode or os.getenv("HR_REPORT_CHUNK_MODE", "legacy")).strip().lower() or "legacy"
+    if resolved_mode not in {"legacy", "semantic"}:
+        resolved_mode = "legacy"
+    semantic_mode = resolved_mode == "semantic"
     stats = {
         "candidate_chunks": 0,
         "kept_chunks": 0,
         "dropped_chunks": 0,
         "dropped_low_info": 0,
         "short_but_salient_kept": 0,
+        "sections_detected": 0,
+        "chunks_by_type": {"list": 0, "table": 0, "prose": 0},
+        "avg_chunk_chars": 0.0,
     }
 
     logger.info(
-        "chunker_start docs=%s max_chars=%s overlap=%s",
+        "chunker_start docs=%s max_chars=%s overlap=%s mode=%s",
         len(documents),
         max_chars,
         overlap_chars,
+        resolved_mode,
     )
     for doc in documents:
         source_type = getattr(doc, "source_type", "text")
         apply_quality_gate = source_type == "url"
-        split_by_headings = source_type == "url"
+        split_by_headings = source_type in {"url", "file"} and _looks_structured_markdown(doc.text)
+        if not semantic_mode and source_type == "file":
+            split_by_headings = False
+
+        list_table_max_chars: int | None = None
+        if semantic_mode:
+            list_table_max_chars = max(1400, min(1800, int(max_chars * 0.45)))
         logger.debug(
             "chunker_doc doc_id=%s source=%s source_type=%s text_chars=%s",
             doc.doc_id,
@@ -318,24 +551,25 @@ def chunk_documents(
         if split_by_headings:
             sections = _split_sections(doc.text)
             if not sections:
-                sections = [("General", doc.text)]
+                sections = [_Section(heading_path=["General"], text=doc.text, start_offset=0)]
         else:
             # File/text inputs usually carry dense relevant context; keep larger contiguous chunks.
-            sections = [("General", doc.text)]
+            sections = [_Section(heading_path=["General"], text=doc.text, start_offset=0)]
 
         seq = 1
-        section_cursor = 0
-        for section, text in sections:
-            section_start = doc.text.find(text, section_cursor)
-            if section_start < 0:
-                section_start = section_cursor
-            section_cursor = max(section_start + len(text), section_cursor)
+        stats["sections_detected"] = int(stats["sections_detected"]) + len(sections)
+        for section in sections:
+            text = section.text
+            section_start = int(section.start_offset)
+            heading_path = section.heading_path[:] if section.heading_path else ["General"]
+            section_label = heading_path[-1] if heading_path else "General"
 
             for part, start_char, end_char in _chunk_text_with_offsets(
                 text,
                 base_offset=section_start,
                 max_chars=max_chars,
                 overlap_chars=overlap_chars,
+                list_table_max_chars=list_table_max_chars,
             ):
                 stats["candidate_chunks"] = int(stats["candidate_chunks"]) + 1
                 stripped_part = part.strip()
@@ -352,8 +586,10 @@ def chunk_documents(
                 chunk = TextChunk(
                     chunk_id=chunk_id,
                     doc_id=doc.doc_id,
-                    section=section,
-                    heading_path=[section],
+                    doc_title=doc.title,
+                    source=doc.source,
+                    section=section_label,
+                    heading_path=heading_path,
                     is_list=_is_list_chunk(part),
                     is_table=_is_table_chunk(part),
                     start_char=start_char,
@@ -362,10 +598,17 @@ def chunk_documents(
                     text=part,
                 )
                 chunks.append(chunk)
+                if chunk.is_list:
+                    stats["chunks_by_type"]["list"] = int(stats["chunks_by_type"]["list"]) + 1
+                elif chunk.is_table:
+                    stats["chunks_by_type"]["table"] = int(stats["chunks_by_type"]["table"]) + 1
+                else:
+                    stats["chunks_by_type"]["prose"] = int(stats["chunks_by_type"]["prose"]) + 1
                 index[chunk_id] = {
                     "doc_id": doc.doc_id,
-                    "section": section,
-                    "heading_path": [section],
+                    "doc_title": doc.title,
+                    "section": section_label,
+                    "heading_path": heading_path,
                     "is_list": chunk.is_list,
                     "is_table": chunk.is_table,
                     "start_char": start_char,
@@ -376,14 +619,19 @@ def chunk_documents(
                 }
                 stats["kept_chunks"] = int(stats["kept_chunks"]) + 1
 
+    if chunks:
+        stats["avg_chunk_chars"] = round(sum(len(chunk.text) for chunk in chunks) / len(chunks), 2)
+
     global _CHUNK_STATS
     _CHUNK_STATS = stats
     logger.info(
-        "chunker_done candidate=%s kept=%s dropped=%s short_but_salient_kept=%s",
+        "chunker_done candidate=%s kept=%s dropped=%s short_but_salient_kept=%s sections=%s avg_chunk_chars=%s",
         stats["candidate_chunks"],
         stats["kept_chunks"],
         stats["dropped_chunks"],
         stats["short_but_salient_kept"],
+        stats["sections_detected"],
+        stats["avg_chunk_chars"],
     )
 
     return chunks, index

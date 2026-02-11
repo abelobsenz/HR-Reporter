@@ -1011,8 +1011,8 @@ def _best_value_text_for_field(field_path: str, rows: List[Dict[str, Any]]) -> s
             return str(max(set(values), key=values.count))
         return ""
     if field_path == "headcount_range":
-        match = re.search(r"\b(\d{1,5}\s*(?:-|to)\s*\d{1,5}|\d{1,5}\+)\b", joined, flags=re.IGNORECASE)
-        return match.group(1) if match else ""
+        normalized = _normalize_headcount_range_text(joined)
+        return normalized or ""
     if field_path == "hris_data.hris_system":
         for system in HRIS_SYSTEM_NAMES:
             if re.search(rf"\b{re.escape(system.lower())}\b", lower):
@@ -1166,11 +1166,14 @@ def _parse_value_text_for_field(field_path: str, value_text: str) -> Any:
         return None
     lower = raw.lower()
     if field_path == "headcount":
+        if HEADCOUNT_RANGE_OR_PLUS_RE.search(lower):
+            return None
+        if HEADCOUNT_INEXACT_RE.search(lower):
+            return None
         match = re.search(r"\b(\d{1,5})\b", raw)
         return int(match.group(1)) if match else None
     if field_path == "headcount_range":
-        match = re.search(r"\b(\d{1,5}\s*(?:-|to)\s*\d{1,5}|\d{1,5}\+)\b", raw, flags=re.IGNORECASE)
-        return match.group(1) if match else None
+        return _normalize_headcount_range_text(raw)
     if field_path in BOOLEAN_TRACKED_FIELDS:
         if lower in {"true", "yes", "present", "in place", "documented"}:
             return True
@@ -1201,6 +1204,95 @@ def _status_from_verdict(
     )
 
 
+def _normalize_headcount_range_text(raw: str) -> str | None:
+    text = " ".join((raw or "").split()).strip()
+    if not text:
+        return None
+    range_match = re.search(
+        r"\b(\d{1,5})\s*(?:-|–|to)\s*(\d{1,5})\b",
+        text,
+        flags=re.IGNORECASE,
+    )
+    if range_match:
+        lo = int(range_match.group(1))
+        hi = int(range_match.group(2))
+        return f"{min(lo, hi)}-{max(lo, hi)}"
+    plus_match = re.search(r"\b(\d{1,5})\s*\+", text)
+    if plus_match:
+        return f"{int(plus_match.group(1))}+"
+    if HEADCOUNT_INEXACT_RE.search(text):
+        exact_match = re.search(r"\b(\d{1,5})\b", text)
+        if exact_match:
+            return f"{int(exact_match.group(1))}+"
+    return None
+
+
+def _citations_to_range(citations: List[Dict[str, Any]]) -> str | None:
+    for citation in citations:
+        snippet = str(citation.get("snippet", "")).strip()
+        normalized = _normalize_headcount_range_text(snippet)
+        if normalized:
+            return normalized
+    return None
+
+
+def _exact_headcount_from_citations(
+    *,
+    value: int,
+    citations: List[Dict[str, Any]],
+) -> bool:
+    if not citations:
+        return False
+    for citation in citations:
+        snippet = str(citation.get("snippet", "")).strip()
+        parsed = _extract_exact_headcount_from_sentence(snippet)
+        if parsed is not None and parsed[0] == value:
+            return True
+    return False
+
+
+def _exact_headcount_from_row(
+    *,
+    row: Dict[str, Any],
+    citations: List[Dict[str, Any]],
+) -> int | None:
+    retrieval_status = str(row.get("retrieval_status") or "").strip()
+    if retrieval_status and retrieval_status != "MENTIONED_EXPLICIT":
+        return None
+    if bool(row.get("needs_confirmation", False)):
+        return None
+    confidence = float(row.get("confidence", 0.0) or 0.0)
+    if confidence < 0.85:
+        return None
+    value_text = str(row.get("value_text", "") or "")
+    parsed = _parse_value_text_for_field("headcount", value_text)
+    if parsed is None:
+        return None
+    if not _exact_headcount_from_citations(value=parsed, citations=citations):
+        return None
+    return parsed
+
+
+def _set_headcount_range_evidence(
+    *,
+    payload: Dict[str, Any],
+    evidence_map: Dict[str, Any],
+    range_value: str,
+    citations: List[Dict[str, Any]],
+    retrieval_status: str | None,
+) -> None:
+    _set_path(payload, "headcount_range", range_value)
+    range_evidence = evidence_map.get("headcount_range", {})
+    if not isinstance(range_evidence, dict):
+        range_evidence = {}
+    range_evidence["status"] = "present"
+    range_evidence["citations"] = citations
+    range_evidence["match_count"] = len(citations)
+    if retrieval_status:
+        range_evidence["retrieval_status"] = retrieval_status
+    evidence_map["headcount_range"] = range_evidence
+
+
 def _overlay_analysis_on_snapshot_payload(
     *,
     payload: Dict[str, Any],
@@ -1210,6 +1302,7 @@ def _overlay_analysis_on_snapshot_payload(
     evidence_map = payload.get("evidence_map", {})
     if not isinstance(evidence_map, dict):
         evidence_map = {}
+    exact_headcount_set = False
 
     for row in analysis_rows:
         field_path = str(row.get("field_path", "")).strip()
@@ -1251,10 +1344,51 @@ def _overlay_analysis_on_snapshot_payload(
         evidence_map[field_path] = evidence
 
         parsed_value = _parse_value_text_for_field(field_path, str(row.get("value_text", "")))
+        if field_path == "headcount":
+            exact_value = _exact_headcount_from_row(row=row, citations=citations) if status == "present" else None
+            if status == "present" and exact_value is not None:
+                _set_path(payload, "headcount", exact_value)
+                exact_headcount_set = True
+            else:
+                _set_path(payload, "headcount", None)
+                inferred_range = _normalize_headcount_range_text(str(row.get("value_text", "") or ""))
+                if inferred_range is None:
+                    inferred_range = _citations_to_range(citations)
+                if inferred_range:
+                    _set_headcount_range_evidence(
+                        payload=payload,
+                        evidence_map=evidence_map,
+                        range_value=inferred_range,
+                        citations=citations,
+                        retrieval_status=retrieval_status,
+                    )
+            continue
+
+        if field_path == "headcount_range":
+            if status == "present":
+                normalized_range = _normalize_headcount_range_text(str(row.get("value_text", "") or ""))
+                if normalized_range is None:
+                    normalized_range = _citations_to_range(citations)
+                if normalized_range:
+                    _set_headcount_range_evidence(
+                        payload=payload,
+                        evidence_map=evidence_map,
+                        range_value=normalized_range,
+                        citations=citations,
+                        retrieval_status=retrieval_status,
+                    )
+                    if not exact_headcount_set:
+                        _set_path(payload, "headcount", None)
+                else:
+                    _set_path(payload, "headcount_range", None)
+            else:
+                _set_path(payload, "headcount_range", None)
+                if not exact_headcount_set:
+                    _set_path(payload, "headcount", None)
+            continue
+
         if status == "present" and parsed_value is not None:
             _set_path(payload, field_path, parsed_value)
-        elif status != "present" and field_path in {"headcount", "headcount_range"}:
-            _set_path(payload, field_path, None)
 
     payload["evidence_map"] = evidence_map
     return payload
@@ -1538,6 +1672,8 @@ def _prepare_snapshot_chunks(
             TextChunk(
                 chunk_id=chunk.chunk_id,
                 doc_id=chunk.doc_id,
+                doc_title=chunk.doc_title,
+                source=chunk.source,
                 section=chunk.section,
                 heading_path=list(chunk.heading_path),
                 is_list=bool(chunk.is_list),
@@ -1553,11 +1689,39 @@ def _prepare_snapshot_chunks(
 
 def _is_sentence_like_citation(snippet: str) -> bool:
     text = " ".join(str(snippet).split()).strip()
+    if not text:
+        return False
+    if re.match(r"^\s{0,3}#{1,6}\s+\S+", text):
+        return False
+    if _is_policy_list_or_table_item(text):
+        return True
+    lower = text.lower()
+    if HEADCOUNT_RANGE_OR_PLUS_RE.search(lower) or _extract_exact_headcount_from_sentence(text):
+        return len(text) >= 25
     if len(text) < 60:
         return False
     if not any(token in text for token in [".", ":", ";"]):
         return False
     return True
+
+
+def _is_policy_list_or_table_item(text: str) -> bool:
+    stripped = text.strip()
+    if len(stripped) < 25:
+        return False
+    is_bullet = bool(re.match(r"^\s*([-*]|\d+[.)])\s+", stripped))
+    is_table_row = "|" in stripped and stripped.count("|") >= 2
+    if not is_bullet and not is_table_row:
+        return False
+    lower = stripped.lower()
+    has_signal = bool(
+        re.search(r"\b\d{1,4}\b", stripped)
+        or re.search(r"\$\s*\d", stripped)
+        or re.search(r"\b(day|days|week|weeks|month|months|year|years|hour|hours)\b", lower)
+        or re.search(r"\b(eligible|eligibility|must|required|may|will|prohibited|entitled)\b", lower)
+        or re.search(r"\b(employee|employees|manager|leave|overtime|benefits|policy)\b", lower)
+    )
+    return has_signal
 
 
 def _filter_sentence_like_citations(raw_citations: Any) -> List[Dict[str, str]]:

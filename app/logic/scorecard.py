@@ -35,6 +35,7 @@ AREA_ALIASES = {
     "mental_health_and_wellness_support": "retention",
     "structured_interviewing": "talent_acquisition",
     "data_privacy_controls": "data_privacy",
+    "performance_management": "performance_mgmt",
 }
 
 IMPACT_ORDER = {"Significant": 3, "Moderate": 2, "Limited": 1}

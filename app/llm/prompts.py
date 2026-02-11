@@ -11,8 +11,12 @@ You extract HR facts into the provided JSON schema.
 Rules:
 1) Use only the provided source chunks or curated evidence payload. Never use outside knowledge.
 2) Never invent facts. If a value is not explicitly stated, set it to null.
-3) Only use sentence-level evidence. Citations must be 1-2 complete, standalone sentences copied verbatim.
-   Do not cite headings, menus, labels, or clipped fragments.
+3) Citations must be copied verbatim from source text and be either:
+   - 1-2 complete, standalone sentences, OR
+   - a single bullet/list item or a single table row when it is a self-contained policy statement
+     (for example: quantity/money/duration/eligibility rules, or clear directives like "Employees may...").
+   Do not cite menus/navigation/TOC fragments, and do not cite headings alone.
+   If a heading provides context (for example "Bereavement Leave"), cite a bullet/table row under it instead.
 4) Evidence map:
    - If evidence supports the field: status "present" and include citations.
    - If evidence explicitly says it is missing: status "explicitly_missing" and include citations.
@@ -63,16 +67,36 @@ def _compact_json(payload: Dict[str, Any]) -> str:
     return json.dumps(payload, separators=(",", ":"), ensure_ascii=False)
 
 
+def _fallback_doc_title(chunk: TextChunk) -> str:
+    if chunk.doc_title and chunk.doc_title.strip():
+        return chunk.doc_title.strip()
+    stem = chunk.doc_id.rsplit("-", 1)[0] if "-" in chunk.doc_id else chunk.doc_id
+    return stem.replace("_", " ").replace("-", " ").strip() or chunk.doc_id
+
+
+def _short_source(value: str | None, max_len: int = 96) -> str:
+    raw = (value or "").strip()
+    if not raw:
+        return "unknown"
+    if len(raw) <= max_len:
+        return raw
+    return f"...{raw[-(max_len - 3):]}"
+
+
 def chunks_to_prompt_text(chunks: List[TextChunk], max_chars_per_chunk: int = 1400) -> str:
     blocks: List[str] = []
     for chunk in chunks:
         text = chunk.text.strip()
         if len(text) > max_chars_per_chunk:
             text = f"{text[:max_chars_per_chunk]}..."
+        heading_path = " > ".join([part.strip() for part in chunk.heading_path if part and part.strip()]) or chunk.section
         blocks.append(
             f"[chunk_id={chunk.chunk_id}]\n"
             f"doc_id={chunk.doc_id}\n"
+            f"doc_title={_fallback_doc_title(chunk)}\n"
+            f"source={_short_source(chunk.source)}\n"
             f"section={chunk.section}\n"
+            f"heading_path={heading_path}\n"
             f"text:\n{text}"
         )
     return "\n\n".join(blocks)
@@ -90,7 +114,10 @@ def build_snapshot_user_prompt(
         "task": "Extract CompanyPeopleSnapshot",
         "tracked_fields_for_evidence_map": list(tracked_fields),
         "assessment_context": assessment_context or "",
-        "citation_rule": "Citations must be 1-2 complete standalone sentences copied verbatim from source text.",
+        "citation_rule": (
+            "Citations must be copied verbatim and can be complete sentences OR one self-contained bullet/table row "
+            "that states policy/eligibility/duration/quantity rules."
+        ),
         "additional_guidance": overrides.get("snapshot_guidance", ""),
     }
     return (
